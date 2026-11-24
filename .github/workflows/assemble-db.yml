@@ -3,8 +3,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - 'tools/db.rs.b64.a'
-      - 'tools/db.rs.b64.b'
+      - 'tools/db.zlib.part*'
       - 'tools/assemble_db.py'
 permissions:
   contents: write
