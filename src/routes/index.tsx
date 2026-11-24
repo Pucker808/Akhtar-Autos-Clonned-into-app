@@ -10,6 +10,7 @@ import { connectGoogleDrive, disconnectGoogleDrive, driveConfigured, isGoogleDri
 import { ReceiptStudio } from "../components/receipt-studio";
 import { getAppTheme, saveAppTheme, getReceiptDesign, renderReceiptHtml, type AppTheme } from "../lib/receipt";
 import { getSettings } from "../lib/settings";
+import { askText, askConfirm, printHtml } from "@/lib/ui-dialogs";
 
 export const Route = createFileRoute("/")({ component: Index });
 type Tab = "overview" | "inventory" | "sales" | "purchases" | "parties" | "expenses" | "reports" | "settings";
@@ -132,7 +133,7 @@ function Index() {
     }
   }
 
-  const ask = (s: string, d = "") => window.prompt(s, d);
+  const ask = async (s: string, d = ""): Promise<string | null> => askText(s, d);
 
   function addCart(lines: CartLine[], setLines: (v: CartLine[]) => void, item: Item, ratePaisa: number) {
     const hit = lines.find((l) => l.itemId === item.id);
@@ -201,64 +202,64 @@ function Index() {
     }, "Purchase saved and stock updated.");
   }
 
-  function doSaleReturn(s: Sale) {
+  async function doSaleReturn(s: Sale) {
     if (!s.lines?.length) { setMsg("No lines on this invoice"); return; }
-    const sku = ask("Return item SKU / name (from invoice)");
+    const sku = await ask("Return item SKU / name (from invoice)");
     if (!sku) return;
     const line = s.lines.find((l) => l.name.toLowerCase().includes(sku.toLowerCase()) || l.sku.toLowerCase() === sku.toLowerCase());
     if (!line) { setMsg("Item not found on this invoice"); return; }
     const max = line.qty - (line.returnedQty || 0);
     if (max <= 0) { setMsg("Nothing left to return for this item"); return; }
-    const qty = Number(ask(`Qty to return (max ${max})`, "1"));
+    const qty = Number(await ask(`Qty to return (max ${max})`, "1"));
     if (!Number.isInteger(qty) || qty < 1 || qty > max) { setMsg("Invalid quantity"); return; }
-    const refund = toPaisa(ask("Cash refund amount Rs (0 = full credit)", String(Math.round((line.price * qty) / 100))) || "0");
-    const method = (ask("Refund method: cash / bank / easypaisa / jazzcash", "cash") || "cash") as PayMethod;
+    const refund = toPaisa(await ask("Cash refund amount Rs (0 = full credit)", String(Math.round((line.price * qty) / 100))) || "0");
+    const method = (await ask("Refund method: cash / bank / easypaisa / jazzcash", "cash") || "cash") as PayMethod;
     void act(() => returnSale({ saleId: s.id!, lines: [{ itemId: line.itemId, qty }], refundCash: refund, method }), "Sale return recorded.");
   }
-  function doPurchaseReturn(p: Purchase) {
+  async function doPurchaseReturn(p: Purchase) {
     if (!p.lines?.length) { setMsg("No lines on this bill"); return; }
-    const sku = ask("Return item SKU / name (from bill)");
+    const sku = await ask("Return item SKU / name (from bill)");
     if (!sku) return;
     const line = p.lines.find((l) => l.name.toLowerCase().includes(sku.toLowerCase()));
     if (!line) { setMsg("Item not found on this bill"); return; }
     const max = line.qty - (line.returnedQty || 0);
     if (max <= 0) { setMsg("Nothing left to return for this item"); return; }
-    const qty = Number(ask(`Qty to return (max ${max})`, "1"));
+    const qty = Number(await ask(`Qty to return (max ${max})`, "1"));
     if (!Number.isInteger(qty) || qty < 1 || qty > max) { setMsg("Invalid quantity"); return; }
-    const refund = toPaisa(ask("Cash refund received from supplier Rs (0 = credit note)", "0") || "0");
+    const refund = toPaisa(await ask("Cash refund received from supplier Rs (0 = credit note)", "0") || "0");
     void act(() => returnPurchase({ purchaseId: p.id!, lines: [{ itemId: line.itemId, qty }], refundCash: refund }), "Purchase return recorded. Stock reduced.");
   }
 
-  function addParty(kind: "customers" | "suppliers") {
-    const name = ask("Name");
+  async function addParty(kind: "customers" | "suppliers") {
+    const name = await ask("Name");
     if (!name) return;
-    const phone = ask("Phone", "") || "";
-    const address = ask("Address", "") || "";
+    const phone = await ask("Phone", "") || "";
+    const address = await ask("Address", "") || "";
     void act(() => saveParty(kind, { name, phone, address }), "Party saved.");
   }
-  function addExpense() {
-    const category = ask("Expense category", "Shop expense");
+  async function addExpense() {
+    const category = await ask("Expense category", "Shop expense");
     if (!category) return;
-    const amount = toPaisa(ask("Amount in Rs", "0") || "0");
-    const method = (ask("Payment method: cash / bank / easypaisa / jazzcash", "cash") || "cash") as PayMethod;
-    void act(() => saveExpense({ date: Date.now(), category, amount, method, payee: ask("Paid to", "") || "" }), "Expense saved.");
+    const amount = toPaisa(await ask("Amount in Rs", "0") || "0");
+    const method = (await ask("Payment method: cash / bank / easypaisa / jazzcash", "cash") || "cash") as PayMethod;
+    const payee = (await ask("Paid to", "")) || "";
+    void act(() => saveExpense({ date: Date.now(), category, amount, method, payee }), "Expense saved.");
   }
-  function payment(kind: "customer" | "supplier", party: Party) {
-    const amount = toPaisa(ask("Amount in Rs", "0") || "0");
+  async function payment(kind: "customer" | "supplier", party: Party) {
+    const amount = toPaisa(await ask("Amount in Rs", "0") || "0");
     if (amount <= 0) return;
-    const method = (ask("Method: cash / bank / easypaisa / jazzcash", "cash") || "cash") as PayMethod;
+    const method = (await ask("Method: cash / bank / easypaisa / jazzcash", "cash") || "cash") as PayMethod;
     void act(() => recordPayment({ partyType: kind, partyId: party.id!, amount, method }), "Payment recorded.");
   }
 
   async function openReceipt(s: Sale) {
     const [design, settings] = await Promise.all([getReceiptDesign(), getSettings()]);
     const html = renderReceiptHtml(s, design, { shopName: settings.shopName, phone: settings.phone, address: settings.address });
-    const w = window.open("", "_blank", "width=480,height=760");
-    if (!w) { setMsg("Allow pop-ups to print the receipt."); return; }
-    w.document.open();
-    w.document.write(html);
-    w.document.close();
-    setTimeout(() => { w.focus(); w.print(); }, 300);
+    try {
+      printHtml(html);
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "Could not open print preview.");
+    }
   }
 
   return (
@@ -276,7 +277,7 @@ function Index() {
             {tab === "purchases" && <button className="rounded bg-amber-500 px-3 py-2 font-bold" onClick={() => setPurOpen(true)}>Add purchase</button>}
             {tab === "parties" && <><button className="rounded bg-amber-500 px-3 py-2" onClick={() => addParty("customers")}>Add customer</button><button className="rounded bg-amber-500 px-3 py-2" onClick={() => addParty("suppliers")}>Add supplier</button></>}
             {tab === "expenses" && <button className="rounded bg-amber-500 px-3 py-2" onClick={addExpense}>Add expense</button>}
-            {tab === "inventory" && <button className="rounded bg-amber-500 px-3 py-2" onClick={() => { const name = ask("Part name"); if (!name) return; const sku = ask("SKU / code"); if (!sku) return; const cost = toPaisa(ask("Purchase cost Rs", "0") || "0"), price = toPaisa(ask("Selling price Rs", "0") || "0"), qty = Number(ask("Opening quantity", "0")), locationId = locs[0]?.id || 1; void act(() => saveItem({ name, sku, cost, price, unit: "pcs", reorderLevel: 5, locationId, archived: false }, undefined, qty > 0 ? { qty, locationId, unitCost: cost, date: Date.now() } : undefined), "Item saved."); }}>Add item</button>}
+            {tab === "inventory" && <button className="rounded bg-amber-500 px-3 py-2" onClick={() => { void (async () => { const name = await ask("Part name"); if (!name) return; const sku = await ask("SKU / code"); if (!sku) return; const cost = toPaisa(await ask("Purchase cost Rs", "0") || "0"), price = toPaisa(await ask("Selling price Rs", "0") || "0"), qty = Number(await ask("Opening quantity", "0")), locationId = locs[0]?.id || 1; void act(() => saveItem({ name, sku, cost, price, unit: "pcs", reorderLevel: 5, locationId, archived: false }, undefined, qty > 0 ? { qty, locationId, unitCost: cost, date: Date.now() } : undefined), "Item saved."); }}>Add item</button>}
           </div>
         </header>
         <div className="flex gap-1 overflow-x-auto bg-white p-2 lg:hidden">{tabs.map((t) => <button key={t} onClick={() => setTab(t)} className={"rounded px-3 py-2 text-xs capitalize " + (tab === t ? "bg-slate-800 text-white" : "bg-slate-100")}>{t}</button>)}</div>
@@ -378,7 +379,7 @@ function Index() {
               <p className="mt-2 text-xs text-slate-500">Last sync: {lastDriveSync ? new Date(lastDriveSync).toLocaleString() : "Never"}</p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <button disabled={!driveConnected} className="rounded bg-slate-800 px-4 py-2 text-white disabled:opacity-40" onClick={() => void (async () => { try { const t = await uploadDriveBackup(); setLastDriveSync(t); await db.meta.put({ key: "driveLastSync", value: t }); setDriveStatus("Backup uploaded"); } catch (e) { setDriveStatus(e instanceof Error ? e.message : String(e)); } })()}>Upload / Sync Now</button>
-                <button disabled={!driveConnected} className="rounded border px-4 py-2 disabled:opacity-40" onClick={() => { if (!window.confirm("Drive backup will replace all records on this device. Download a local backup first. Continue?")) return; void (async () => { try { const t = await restoreDriveBackup(); setLastDriveSync(t); setDriveStatus("Restore complete"); await refresh(); } catch (e) { setDriveStatus(e instanceof Error ? e.message : String(e)); } })(); }}>Import / Restore from Drive</button>
+                <button disabled={!driveConnected} className="rounded border px-4 py-2 disabled:opacity-40" onClick={() => { void (async () => { if (!(await askConfirm("Drive backup will replace all records on this device. Download a local backup first. Continue?"))) return;  try { const t = await restoreDriveBackup(); setLastDriveSync(t); setDriveStatus("Restore complete"); await refresh(); } catch (e) { setDriveStatus(e instanceof Error ? e.message : String(e)); } })(); }}>Import / Restore from Drive</button>
               </div>
             </Panel>
             <Panel title="Local backup"><p className="mb-3 text-sm">Download a JSON copy of this device's database.</p><button className="rounded bg-amber-500 px-4 py-2" onClick={() => void (async () => { const names = ["items", "locations", "batches", "ledger", "customers", "suppliers", "sales", "saleReturns", "purchases", "purchaseReturns", "payments", "expenses", "audit", "meta"]; const data: any = { app: "Akhtar Autos", version: 1 }; for (const n of names) data[n] = await db.table(n).toArray(); const url = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: "application/json" })); const a = document.createElement("a"); a.href = url; a.download = "akhtar-autos-backup.json"; a.click(); URL.revokeObjectURL(url); })()}>Download backup</button></Panel>
