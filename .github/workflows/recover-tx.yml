@@ -1,0 +1,48 @@
+name: Recover Phase 2 TX sources
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "scripts/tx-recover/**"
+      - ".github/workflows/recover-tx.yml"
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Decode and write recovered sources
+        run: |
+          python3 << 'PY'
+          import base64, zlib, pathlib
+          mapping = [
+            ("scripts/tx-recover/db_tx_part1.b64", "src-tauri/src/db_tx_part1.inc.rs"),
+            ("scripts/tx-recover/db_tx_part2.b64", "src-tauri/src/db_tx_part2.inc.rs"),
+            ("scripts/tx-recover/db_tx_part3.b64", "src-tauri/src/db_tx_part3.inc.rs"),
+            ("scripts/tx-recover/migration.b64", "src/lib/migration.ts"),
+            ("scripts/tx-recover/migration_test.b64", "src/test/migration.test.ts"),
+            ("scripts/tx-recover/phase2_tx_md.b64", "docs/PHASE2_TX.md"),
+          ]
+          for src, dest in mapping:
+              raw = pathlib.Path(src).read_text().strip()
+              data = zlib.decompress(base64.b64decode(raw))
+              p = pathlib.Path(dest)
+              p.parent.mkdir(parents=True, exist_ok=True)
+              p.write_bytes(data)
+              print("wrote", dest, len(data))
+          for dest in [d for _, d in mapping]:
+              t = pathlib.Path(dest).read_text()
+              if "PLACEHOLDER" in t:
+                  raise SystemExit(f"PLACEHOLDER found in {dest}")
+          print("all recovered OK")
+          PY
+      - name: Commit recovered files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src-tauri/src/db_tx_part1.inc.rs src-tauri/src/db_tx_part2.inc.rs src-tauri/src/db_tx_part3.inc.rs src/lib/migration.ts src/test/migration.test.ts docs/PHASE2_TX.md
+          git status
+          git diff --cached --stat
+          git commit -m "Phase 2 TX: recover complete db_tx includes, migration, tests, docs" || echo "no changes"
+          git push
