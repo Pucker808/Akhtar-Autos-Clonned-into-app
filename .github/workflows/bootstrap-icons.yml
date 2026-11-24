@@ -1,0 +1,31 @@
+name: Bootstrap Tauri icons
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "tools/icon-assets.b64.json"
+      - "tools/write_icons.py"
+      - ".github/workflows/bootstrap-icons.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  icons:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Decode icons into src-tauri/icons
+        run: python3 tools/write_icons.py
+      - name: Commit icons if needed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src-tauri/icons
+          if git diff --staged --quiet; then
+            echo "Icons already up to date."
+          else
+            git commit -m "chore: materialize Tauri app icons from tools/icon-assets.b64.json"
+            git push
+          fi

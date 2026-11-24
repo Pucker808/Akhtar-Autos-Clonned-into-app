@@ -1,8 +1,9 @@
 /**
  * Local folder storage for Akhtar Autos.
- * Uses the browser File System Access API (Chrome / Edge / desktop WebView).
- * Data is still queried via Dexie for speed; the chosen folder holds a full
- * JSON snapshot that is written after each change and can be restored on open.
+ * Browser: File System Access API (Chrome / Edge).
+ * Tauri desktop: temporary compatibility path only — primary durable storage is
+ * the hybrid SQLite layout under AppData / user-selected folders (see src-tauri).
+ * Data is still queried via Dexie for speed until SQLite migration is complete.
  */
 import { db, DATA_TABLES } from "./db";
 
@@ -19,12 +20,29 @@ export type LocalFolderStatus = {
   autoSave: boolean;
 };
 
+function isTauriRuntime(): boolean {
+  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+}
+
 function supportsDirectoryPicker(): boolean {
   return typeof window !== "undefined" && typeof (window as any).showDirectoryPicker === "function";
 }
 
+/**
+ * Browser File System Access API support.
+ * Inside Tauri the durable path is hybrid SQLite folders (Rust); this module remains
+ * for web-parity JSON folder sync until the SQLite cutover lands.
+ */
 export function localFolderSupported(): boolean {
+  if (isTauriRuntime()) {
+    // Prefer native dialogs/fs for desktop; FS Access may still work in WebView2 but is not primary.
+    return supportsDirectoryPicker();
+  }
   return supportsDirectoryPicker();
+}
+
+export function localFolderUsesBrowserFsAccess(): boolean {
+  return supportsDirectoryPicker() && !isTauriRuntime();
 }
 
 /** Persist a directory handle in IndexedDB meta so it survives reloads. */
