@@ -227,3 +227,315 @@ pub fn create_new_database(path: &str, confirm_create: bool) -> Result<DbHealth,
 
 /// Schema info for an existing DB (read-only).
 pub fn schema_info(path: &str) -> Result<SchemaInfo, DbError> {
+    let conn = open_readonly(path)?;
+    let version = read_schema_version(&conn).unwrap_or(0);
+    let mut tables = Vec::new();
+    let mut stmt = conn.prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+    )?;
+    let rows = stmt.query_map([], |r| r.get::<_, String>(0))?;
+    for row in rows {
+        tables.push(row?);
+    }
+    let fk: i64 = conn.query_row("PRAGMA foreign_keys", [], |r| r.get(0))?;
+    Ok(SchemaInfo {
+        version,
+        tables,
+        foreign_keys_enabled: fk == 1,
+    })
+}
+
+/// Table row counts (read-only).
+pub fn table_counts(path: &str) -> Result<Vec<TableCount>, DbError> {
+    let conn = open_readonly(path)?;
+    let map = count_all_tables(&conn)?;
+    let mut out: Vec<_> = map
+        .into_iter()
+        .map(|(table, count)| TableCount { table, count })
+        .collect();
+    out.sort_by(|a, b| a.table.cmp(&b.table));
+    Ok(out)
+}
+
+/// Read a meta value by key (read-only).
+pub fn get_meta(path: &str, key: &str) -> Result<Option<String>, DbError> {
+    let conn = open_readonly(path)?;
+    let v: Option<String> = conn
+        .query_row(
+            "SELECT value FROM meta WHERE key = ?1",
+            [key],
+            |r| r.get(0),
+        )
+        .optional()?;
+    Ok(v)
+}
+
+/// Default DB path string for the platform (does not create files).
+pub fn default_db_path_string() -> Result<String, DbError> {
+    crate::storage::default_database_path()
+        .map(|p| p.to_string_lossy().into_owned())
+        .map_err(|e| DbError::Message(e.to_string()))
+}
+
+/// Ensure data directory layout exists without creating a database file.
+pub fn ensure_layout_for_root(root: &str) -> Result<(), DbError> {
+    crate::storage::ensure_data_layout(&PathBuf::from(root))
+        .map_err(|e| DbError::Message(e.to_string()))
+}
+
+/// Initial schema SQL. Only invoked from `create_new_database` after confirmation.
+pub const INIT_SCHEMA_SQL: &str = r#"
+PRAGMA journal_mode = WAL;
+PRAGMA foreign_keys = ON;
+
+CREATE TABLE IF NOT EXISTS meta (
+  key TEXT PRIMARY KEY NOT NULL,
+  value TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS locations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  type TEXT NOT NULL,
+  parent_id INTEGER REFERENCES locations(id) ON DELETE SET NULL,
+  archived INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  device_id TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS customers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  phone TEXT,
+  address TEXT,
+  notes TEXT,
+  archived INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  device_id TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS suppliers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  phone TEXT,
+  address TEXT,
+  notes TEXT,
+  archived INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  device_id TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  sku TEXT NOT NULL UNIQUE,
+  barcode TEXT,
+  name TEXT NOT NULL,
+  category TEXT,
+  brand TEXT,
+  compat TEXT,
+  oem TEXT,
+  unit TEXT NOT NULL DEFAULT 'pcs',
+  reorder_level REAL NOT NULL DEFAULT 0,
+  cost INTEGER NOT NULL DEFAULT 0,
+  price INTEGER NOT NULL DEFAULT 0,
+  supplier_id INTEGER REFERENCES suppliers(id) ON DELETE SET NULL,
+  location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL,
+  notes TEXT,
+  image TEXT,
+  archived INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  device_id TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS batches (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  item_id INTEGER NOT NULL REFERENCES items(id),
+  location_id INTEGER NOT NULL REFERENCES locations(id),
+  qty REAL NOT NULL,
+  remaining REAL NOT NULL,
+  unit_cost INTEGER NOT NULL,
+  date INTEGER NOT NULL,
+  supplier_id INTEGER REFERENCES suppliers(id) ON DELETE SET NULL,
+  source TEXT NOT NULL,
+  ref_id INTEGER,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  device_id TEXT NOT NULL,
+  CHECK (qty >= 0),
+  CHECK (remaining >= 0),
+  CHECK (remaining <= qty),
+  CHECK (unit_cost >= 0)
+);
+
+CREATE TABLE IF NOT EXISTS ledger (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  item_id INTEGER NOT NULL REFERENCES items(id),
+  location_id INTEGER NOT NULL REFERENCES locations(id),
+  type TEXT NOT NULL,
+  qty REAL NOT NULL,
+  cost INTEGER NOT NULL,
+  date INTEGER NOT NULL,
+  ref_type TEXT,
+  ref_id INTEGER,
+  note TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  device_id TEXT NOT NULL,
+  CHECK (cost >= 0)
+);
+
+CREATE TABLE IF NOT EXISTS sales (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  invoice_no TEXT NOT NULL UNIQUE,
+  date INTEGER NOT NULL,
+  customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+  customer_name TEXT NOT NULL,
+  location_id INTEGER NOT NULL REFERENCES locations(id),
+  lines_json TEXT NOT NULL,
+  subtotal INTEGER NOT NULL,
+  discount INTEGER NOT NULL,
+  tax_pct REAL NOT NULL DEFAULT 0,
+  tax INTEGER NOT NULL DEFAULT 0,
+  total INTEGER NOT NULL,
+  paid INTEGER NOT NULL,
+  method TEXT NOT NULL,
+  notes TEXT,
+  status TEXT NOT NULL DEFAULT 'posted',
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  device_id TEXT NOT NULL,
+  CHECK (subtotal >= 0),
+  CHECK (discount >= 0),
+  CHECK (tax >= 0),
+  CHECK (total >= 0),
+  CHECK (paid >= 0)
+);
+
+CREATE TABLE IF NOT EXISTS sale_returns (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  sale_id INTEGER NOT NULL REFERENCES sales(id),
+  invoice_no TEXT NOT NULL,
+  customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+  date INTEGER NOT NULL,
+  lines_json TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  refund_cash INTEGER NOT NULL,
+  credit_amount INTEGER NOT NULL,
+  method TEXT NOT NULL,
+  notes TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  device_id TEXT NOT NULL,
+  CHECK (amount >= 0),
+  CHECK (refund_cash >= 0),
+  CHECK (credit_amount >= 0)
+);
+
+CREATE TABLE IF NOT EXISTS purchases (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  bill_no TEXT NOT NULL,
+  supplier_id INTEGER NOT NULL REFERENCES suppliers(id),
+  date INTEGER NOT NULL,
+  due_date INTEGER,
+  location_id INTEGER NOT NULL REFERENCES locations(id),
+  lines_json TEXT NOT NULL,
+  subtotal INTEGER NOT NULL,
+  discount INTEGER NOT NULL,
+  total INTEGER NOT NULL,
+  paid INTEGER NOT NULL,
+  method TEXT NOT NULL,
+  notes TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  device_id TEXT NOT NULL,
+  CHECK (subtotal >= 0),
+  CHECK (discount >= 0),
+  CHECK (total >= 0),
+  CHECK (paid >= 0)
+);
+
+CREATE TABLE IF NOT EXISTS purchase_returns (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  purchase_id INTEGER NOT NULL REFERENCES purchases(id),
+  supplier_id INTEGER NOT NULL REFERENCES suppliers(id),
+  date INTEGER NOT NULL,
+  lines_json TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  refund_cash INTEGER NOT NULL,
+  credit_amount INTEGER NOT NULL,
+  notes TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  device_id TEXT NOT NULL,
+  CHECK (amount >= 0),
+  CHECK (refund_cash >= 0),
+  CHECK (credit_amount >= 0)
+);
+
+CREATE TABLE IF NOT EXISTS payments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  party_type TEXT NOT NULL,
+  party_id INTEGER NOT NULL,
+  amount INTEGER NOT NULL,
+  method TEXT NOT NULL,
+  date INTEGER NOT NULL,
+  note TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  device_id TEXT NOT NULL,
+  CHECK (amount >= 0),
+  CHECK (party_type IN ('customer', 'supplier'))
+);
+
+CREATE TABLE IF NOT EXISTS expenses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  date INTEGER NOT NULL,
+  category TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  payee TEXT,
+  method TEXT NOT NULL,
+  reference TEXT,
+  notes TEXT,
+  recurring TEXT,
+  voided INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  device_id TEXT NOT NULL,
+  CHECK (amount >= 0)
+);
+
+CREATE TABLE IF NOT EXISTS audit (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  at INTEGER NOT NULL,
+  action TEXT NOT NULL,
+  entity TEXT NOT NULL,
+  entity_id INTEGER,
+  detail TEXT,
+  device_id TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_items_sku ON items(sku);
+CREATE INDEX IF NOT EXISTS idx_items_barcode ON items(barcode);
+CREATE INDEX IF NOT EXISTS idx_items_name ON items(name);
+CREATE INDEX IF NOT EXISTS idx_items_category ON items(category);
+CREATE INDEX IF NOT EXISTS idx_batches_item_loc ON batches(item_id, location_id);
+CREATE INDEX IF NOT EXISTS idx_batches_date ON batches(date);
+CREATE INDEX IF NOT EXISTS idx_ledger_item ON ledger(item_id, location_id, date);
+CREATE INDEX IF NOT EXISTS idx_ledger_type ON ledger(type, date);
+CREATE INDEX IF NOT EXISTS idx_sales_invoice ON sales(invoice_no);
+CREATE INDEX IF NOT EXISTS idx_sales_date ON sales(date);
+CREATE INDEX IF NOT EXISTS idx_sales_customer ON sales(customer_id);
+CREATE INDEX IF NOT EXISTS idx_sale_returns_sale ON sale_returns(sale_id);
+CREATE INDEX IF NOT EXISTS idx_purchases_supplier ON purchases(supplier_id, date);
+CREATE INDEX IF NOT EXISTS idx_purchase_returns_purchase ON purchase_returns(purchase_id);
+CREATE INDEX IF NOT EXISTS idx_payments_party ON payments(party_type, party_id, date);
+CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date, category);
+CREATE INDEX IF NOT EXISTS idx_audit_at ON audit(at, entity);
+
+INSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', '1');
+INSERT OR REPLACE INTO meta(key, value) VALUES ('app', 'Akhtar Autos Desktop');
+"#;
