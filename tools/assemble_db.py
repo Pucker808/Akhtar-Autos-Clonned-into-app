@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
 from pathlib import Path
+import base64
 root = Path(__file__).resolve().parents[1]
-parts = sorted(root.glob("tools/db.rs.part*"))
-assert parts, "missing parts"
+a = (root / "tools/db.rs.b64.a").read_text().strip()
+b = (root / "tools/db.rs.b64.b").read_text().strip()
+raw = base64.b64decode(a + b)
 out = root / "src-tauri/src/db.rs"
-out.write_text("".join(p.read_text() for p in parts))
-print("wrote", out, "bytes", out.stat().st_size)
+out.write_bytes(raw)
+print("wrote", out, "bytes", len(raw))
+assert b"create_new_database" in raw
+assert b"INIT_SCHEMA_SQL" in raw
+assert b"PLACEHOLDER" not in raw
