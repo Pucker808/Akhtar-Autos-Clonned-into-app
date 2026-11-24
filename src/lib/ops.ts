@@ -288,42 +288,53 @@ export async function recordPayment(p: { partyType: "customer" | "supplier"; par
   if (p.method === "credit") throw new OpError("Choose how the money was paid");
   return db.transaction("rw", ALL(), async () => {
     const id = await db.payments.add(stamp({ ...p, date: p.date ?? now() }));
-    await audit("payment", p.partyType, p.partyId, `${p.amount}`);
+    await audit("payment", p.partyType, p.partyId, String(p.amount));
     return id;
   });
 }
 
-// ---------- Expenses ----------
-export async function saveExpense(p: { category: string; amount: Paisa; date: number; note?: string; method: PayMethod }, id?: number) {
-  if (!p.category.trim()) throw new OpError("Category is required");
-  if (!(p.amount > 0)) throw new OpError("Amount must be greater than zero");
-  if (id) {
-    await db.expenses.update(id, { ...p, updatedAt: now() });
-    await audit("edit", "expense", id, p.category);
-    return id;
-  }
-  const nid = await db.expenses.add(stamp({ ...p, voided: false }));
-  await audit("create", "expense", nid, p.category);
+export async function customerBalance(id: number): Promise<Paisa> {
+  const [sales, rets, pays] = await Promise.all([
+    db.sales.where("customerId").equals(id).toArray(),
+    db.saleReturns.where("customerId").equals(id).toArray(),
+    db.payments.where("[partyType+partyId]").equals(["customer", id]).toArray(),
+  ]);
+  return sales.filter((s) => s.status === "posted").reduce((a, s) => a + s.total - s.paid, 0) - rets.reduce((a, r) => a + r.creditAmount, 0) - pays.reduce((a, p) => a + p.amount, 0);
+}
+export async function supplierBalance(id: number): Promise<Paisa> {
+  const [pur, rets, pays] = await Promise.all([
+    db.purchases.where("supplierId").equals(id).toArray(),
+    db.purchaseReturns.where("supplierId").equals(id).toArray(),
+    db.payments.where("[partyType+partyId]").equals(["supplier", id]).toArray(),
+  ]);
+  return pur.reduce((a, s) => a + s.total - s.paid, 0) - rets.reduce((a, r) => a + r.creditAmount, 0) - pays.reduce((a, p) => a + p.amount, 0);
+}
+
+// ---------- Expenses & locations ----------
+export async function saveExpense(e: Omit<Expense, "id" | "createdAt" | "updatedAt" | "deviceId">, id?: number) {
+  if (!(e.amount > 0)) throw new OpError("Amount must be greater than zero");
+  if (!e.category.trim()) throw new OpError("Category is required");
+  if (id) { await db.expenses.update(id, { ...e, updatedAt: now() }); await audit("edit", "expense", id); return id; }
+  const nid = await db.expenses.add(stamp(e));
+  await audit("create", "expense", nid, `${e.category} ${e.amount}`);
   return nid;
 }
 export async function voidExpense(id: number) {
   await db.expenses.update(id, { voided: true, updatedAt: now() });
   await audit("void", "expense", id);
 }
-
-// ---------- Locations ----------
-export async function saveLocation(data: Pick<Location, "name" | "type">, id?: number) {
-  if (!data.name.trim()) throw new OpError("Location name is required");
-  if (id) {
-    await db.locations.update(id, { ...data, updatedAt: now() });
-    await audit("edit", "location", id, data.name);
-    return id;
-  }
-  const nid = await db.locations.add(stamp({ ...data, name: data.name.trim(), archived: false }));
-  await audit("create", "location", nid, data.name);
+export async function saveLocation(l: Pick<Location, "name" | "type" | "parentId">, id?: number) {
+  if (!l.name.trim()) throw new OpError("Name is required");
+  if (id) { await db.locations.update(id, { ...l, updatedAt: now() }); await audit("edit", "location", id); return id; }
+  const nid = await db.locations.add(stamp(l));
+  await audit("create", "location", nid, l.name);
   return nid;
 }
 export async function setLocationArchived(id: number, archived: boolean) {
+  if (archived) {
+    const rows = await db.ledger.where("locationId").equals(id).toArray();
+    if (rows.reduce((s, r) => s + r.qty, 0) !== 0) throw new OpError("Transfer all stock out before archiving this location");
+  }
   await db.locations.update(id, { archived, updatedAt: now() });
   await audit(archived ? "archive" : "restore", "location", id);
 }
