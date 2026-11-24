@@ -1,0 +1,56 @@
+name: Import frontend from web app
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout desktop repo
+        uses: actions/checkout@v4
+        with:
+          path: desktop
+
+      - name: Checkout web app source
+        uses: actions/checkout@v4
+        with:
+          repository: Pucker808/akhtar-autoparts-manager
+          path: web
+
+      - name: Copy frontend (preserve desktop package.json, README, src-tauri)
+        run: |
+          set -euo pipefail
+          cd desktop
+          # Copy source tree
+          mkdir -p src public docs
+          rsync -a --delete --exclude='.git' web/src/ src/
+          rsync -a web/public/ public/
+          # Config files from web (do not overwrite package.json / README / .gitignore)
+          for f in components.json eslint.config.js tsconfig.json vite.config.ts vitest.config.ts bunfig.toml .env.example .prettierrc .prettierignore AGENTS.md; do
+            if [ -f "web/$f" ]; then cp "web/$f" "./$f"; fi
+          done
+          # Docs from web (keep existing ARCHITECTURE.md and PHASE1.md)
+          for f in LOCAL_AND_DESKTOP.md google-drive-setup.md; do
+            if [ -f "web/docs/$f" ]; then cp "web/docs/$f" "docs/$f"; fi
+          done
+          # Ensure src-tauri is untouched (never copied from web)
+          test -f src-tauri/tauri.conf.json
+          test -f package.json
+          echo "Copied frontend. package.json and src-tauri preserved."
+
+      - name: Commit if changed
+        working-directory: desktop
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Phase 1: import complete frontend and business logic from akhtar-autoparts-manager"
+            git push
+          fi
