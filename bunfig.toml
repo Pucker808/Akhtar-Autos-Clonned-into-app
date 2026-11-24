@@ -1,0 +1,2 @@
+[install]
+# Prefer npm registry resolution compatible with package-lock/npm workflows
