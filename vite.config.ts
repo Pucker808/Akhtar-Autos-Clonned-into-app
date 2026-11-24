@@ -1,18 +1,39 @@
-// @lovable.dev/vite-tanstack-config already includes the following — do NOT add them manually
-// or the app will break with duplicate plugins:
-//   - TanStack devtools (dev-only, first), tanstackStart, viteReact, tailwindcss, tsConfigPaths,
-//     nitro (build-only using cloudflare as a default target), VITE_* env injection, @ path alias,
-//     React/TanStack dedupe, error logger plugins, and sandbox detection (port/host/strictPort).
-// Never set ssr.external or resolve.external: the Worker has no runtime module resolution, so
-// the build fails. Never add compression (compressPublicAssets, vite-plugin-compression):
-// hosting already compresses at the edge.
-// You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
+/**
+ * Akhtar Autos Desktop — Vite config for Tauri WebView.
+ * Outputs static assets to dist/ (see src-tauri/tauri.conf.json frontendDist).
+ * Desktop-specific overrides live here; the original web app is untouched.
+ */
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+
+const host = process.env.TAURI_DEV_HOST;
 
 export default defineConfig({
   tanstackStart: {
-    // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
-    // nitro/vite builds from this
+    // Existing server entry kept for Start compatibility; Tauri serves the client build only.
     server: { entry: "server" },
+  },
+  vite: {
+    clearScreen: false,
+    envPrefix: ["VITE_", "TAURI_"],
+    server: {
+      port: 5173,
+      strictPort: true,
+      host: host || false,
+      hmr: host
+        ? {
+            protocol: "ws",
+            host,
+            port: 1421,
+          }
+        : undefined,
+      watch: {
+        ignored: ["**/src-tauri/**"],
+      },
+    },
+    build: {
+      outDir: "dist",
+      emptyOutDir: true,
+      target: "esnext",
+    },
   },
 });

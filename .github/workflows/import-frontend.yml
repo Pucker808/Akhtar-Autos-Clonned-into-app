@@ -1,3 +1,5 @@
+# One-shot helper to re-import frontend sources from the original web repository.
+# Desktop-owned paths are protected and must never be deleted or overwritten.
 name: Import frontend from web app
 
 on:
@@ -15,40 +17,64 @@ jobs:
         with:
           path: desktop
 
-      - name: Checkout web app source
+      - name: Checkout web app (read-only source)
         uses: actions/checkout@v4
         with:
           repository: Pucker808/akhtar-autoparts-manager
           path: web
 
-      - name: Copy frontend (preserve desktop package.json, README, src-tauri)
-        working-directory: desktop
+      - name: Copy frontend sources without wiping desktop files
+        working-directory: ${
+{ github.workspace }}
         run: |
           set -euo pipefail
-          WEB="${GITHUB_WORKSPACE}/web"
-          test -d "$WEB/src"
-          mkdir -p src public docs
-          rsync -a --delete --exclude='.git' "$WEB/src/" src/
-          rsync -a "$WEB/public/" public/
-          for f in components.json eslint.config.js tsconfig.json vite.config.ts vitest.config.ts bunfig.toml .env.example .prettierrc .prettierignore AGENTS.md; do
-            if [ -f "$WEB/$f" ]; then cp "$WEB/$f" "./$f"; fi
+          DESKTOP="$GITHUB_WORKSPACE/desktop"
+          WEB="$GITHUB_WORKSPACE/web"
+
+          # Never touch these desktop-owned paths
+          PROTECT=(
+            "src-tauri"
+            "package.json"
+            "README.md"
+            ".gitignore"
+            "docs/ARCHITECTURE.md"
+            "docs/PHASE1.md"
+            "docs/SQLITE_MIGRATION.md"
+            ".github"
+            "tools"
+            "vite.config.ts"
+          )
+
+          mkdir -p "$DESKTOP/src" "$DESKTOP/public" "$DESKTOP/docs"
+
+          rsync -a "$WEB/src/components/" "$DESKTOP/src/components/"
+          rsync -a "$WEB/src/hooks/" "$DESKTOP/src/hooks/"
+          rsync -a "$WEB/src/lib/" "$DESKTOP/src/lib/"
+          rsync -a "$WEB/src/routes/" "$DESKTOP/src/routes/"
+          rsync -a "$WEB/src/test/" "$DESKTOP/src/test/"
+          rsync -a "$WEB/public/" "$DESKTOP/public/"
+
+          for f in src/styles.css src/router.tsx src/routeTree.gen.ts src/server.ts src/start.ts \
+                   components.json eslint.config.js .prettierrc .prettierignore bunfig.toml; do
+            if [ -f "$WEB/$f" ]; then
+              mkdir -p "$DESKTOP/$(dirname "$f")"
+              cp "$WEB/$f" "$DESKTOP/$f"
+            fi
           done
-          for f in LOCAL_AND_DESKTOP.md google-drive-setup.md; do
-            if [ -f "$WEB/docs/$f" ]; then cp "$WEB/docs/$f" "docs/$f"; fi
-          done
-          test -f src-tauri/tauri.conf.json
-          test -f package.json
-          echo "Copied frontend. package.json and src-tauri preserved."
+
+          echo "Protected paths left untouched:"
+          for p in "${PROTECT[@]}"; do echo " - $p"; done
 
       - name: Commit if changed
-        working-directory: desktop
+        working-directory: ${
+{ github.workspace }}/desktop
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           if git diff --staged --quiet; then
-            echo "No changes to commit"
+            echo "No frontend changes to import."
           else
-            git commit -m "Phase 1: import complete frontend and business logic from akhtar-autoparts-manager"
+            git commit -m "chore: re-import frontend from akhtar-autoparts-manager (desktop-protected)"
             git push
           fi
