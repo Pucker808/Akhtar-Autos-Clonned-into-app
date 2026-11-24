@@ -22,22 +22,20 @@ jobs:
           path: web
 
       - name: Copy frontend (preserve desktop package.json, README, src-tauri)
+        working-directory: desktop
         run: |
           set -euo pipefail
-          cd desktop
-          # Copy source tree
+          WEB="${GITHUB_WORKSPACE}/web"
+          test -d "$WEB/src"
           mkdir -p src public docs
-          rsync -a --delete --exclude='.git' web/src/ src/
-          rsync -a web/public/ public/
-          # Config files from web (do not overwrite package.json / README / .gitignore)
+          rsync -a --delete --exclude='.git' "$WEB/src/" src/
+          rsync -a "$WEB/public/" public/
           for f in components.json eslint.config.js tsconfig.json vite.config.ts vitest.config.ts bunfig.toml .env.example .prettierrc .prettierignore AGENTS.md; do
-            if [ -f "web/$f" ]; then cp "web/$f" "./$f"; fi
+            if [ -f "$WEB/$f" ]; then cp "$WEB/$f" "./$f"; fi
           done
-          # Docs from web (keep existing ARCHITECTURE.md and PHASE1.md)
           for f in LOCAL_AND_DESKTOP.md google-drive-setup.md; do
-            if [ -f "web/docs/$f" ]; then cp "web/docs/$f" "docs/$f"; fi
+            if [ -f "$WEB/docs/$f" ]; then cp "$WEB/docs/$f" "docs/$f"; fi
           done
-          # Ensure src-tauri is untouched (never copied from web)
           test -f src-tauri/tauri.conf.json
           test -f package.json
           echo "Copied frontend. package.json and src-tauri preserved."
