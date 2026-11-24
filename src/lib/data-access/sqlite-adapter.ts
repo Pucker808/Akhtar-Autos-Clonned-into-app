@@ -1,9 +1,18 @@
 /**
- * SQLite adapter foundation — Tauri invoke wrappers.
- * Read/health/create only in Phase 2. Write path for ops lands after cutover approval.
+ * SQLite adapter — Tauri invoke wrappers.
+ * Phase 2 TX: health, create, mutations, import/export, backup/restore, FIFO reads.
+ * Write path for live ops is behind the persistence flag; Dexie remains default.
  */
 import { invoke } from "@tauri-apps/api/core";
-import type { DbHealth, SchemaInfo, TableCount } from "./types";
+import type {
+  BackupReport,
+  DbHealth,
+  ImportReport,
+  Mutation,
+  SchemaInfo,
+  TableCount,
+  TxResult,
+} from "./types";
 import { getConfiguredSqlitePath, isTauriRuntime } from "../persistence";
 
 function requireTauri(): void {
@@ -32,10 +41,6 @@ export async function sqliteCheckPath(path: string): Promise<DbHealth> {
   return invoke<DbHealth>("check_database_path", { path });
 }
 
-/**
- * Create a new empty database. Requires confirmCreate === true.
- * Refuses if the file already exists.
- */
 export async function sqliteCreateDatabase(
   path: string,
   confirmCreate: boolean,
@@ -59,15 +64,116 @@ export async function sqliteGetMeta(path: string, key: string): Promise<string |
   return invoke<string | null>("get_meta_value", { path, key });
 }
 
-/** Resolve the active SQLite path: configured override or platform default. */
 export async function resolveSqlitePath(): Promise<string> {
   const configured = getConfiguredSqlitePath();
   if (configured) return configured;
   return sqliteDefaultDatabasePath();
 }
 
-/** Health of the configured/default path without creating a file. */
 export async function sqliteHealthConfigured(): Promise<DbHealth> {
   const path = await resolveSqlitePath();
   return sqliteCheckPath(path);
+}
+
+/** Apply ordered mutations in one SQLite transaction (full rollback on error). */
+export async function sqliteApplyMutations(
+  path: string,
+  mutations: Mutation[],
+): Promise<TxResult> {
+  requireTauri();
+  return invoke<TxResult>("apply_db_mutations", { path, mutations });
+}
+
+export async function sqliteImportSnapshot(
+  path: string,
+  tables: Record<string, Record<string, unknown>[]>,
+  confirmOverwrite: boolean,
+): Promise<ImportReport> {
+  requireTauri();
+  return invoke<ImportReport>("import_db_snapshot", {
+    path,
+    tables,
+    confirmOverwrite,
+  });
+}
+
+export async function sqliteExportTable(
+  path: string,
+  table: string,
+): Promise<Record<string, unknown>[]> {
+  requireTauri();
+  return invoke<Record<string, unknown>[]>("export_db_table", { path, table });
+}
+
+export async function sqliteBackup(
+  source: string,
+  destination: string,
+): Promise<BackupReport> {
+  requireTauri();
+  return invoke<BackupReport>("backup_database", { source, destination });
+}
+
+export async function sqliteRestore(
+  backupPath: string,
+  targetPath: string,
+  confirmRestore: boolean,
+): Promise<DbHealth> {
+  requireTauri();
+  return invoke<DbHealth>("restore_database", {
+    backupPath,
+    targetPath,
+    confirmRestore,
+  });
+}
+
+export async function sqliteBatchesFifo(
+  path: string,
+  itemId: number,
+  locationId: number,
+): Promise<Record<string, unknown>[]> {
+  requireTauri();
+  return invoke<Record<string, unknown>[]>("query_batches_fifo", {
+    path,
+    itemId,
+    locationId,
+  });
+}
+
+export async function sqliteStockQty(
+  path: string,
+  itemId: number,
+  locationId?: number | null,
+): Promise<number> {
+  requireTauri();
+  return invoke<number>("query_stock_qty", {
+    path,
+    itemId,
+    locationId: locationId ?? null,
+  });
+}
+
+export async function sqliteGetRow(
+  path: string,
+  table: string,
+  id: number,
+): Promise<Record<string, unknown> | null> {
+  requireTauri();
+  return invoke<Record<string, unknown> | null>("get_db_row", { path, table, id });
+}
+
+export async function sqliteListRows(
+  path: string,
+  table: string,
+  filterCol?: string,
+  filterVal?: unknown,
+  limit?: number,
+): Promise<Record<string, unknown>[]> {
+  requireTauri();
+  return invoke<Record<string, unknown>[]>("list_db_rows", {
+    path,
+    table,
+    filterCol: filterCol ?? null,
+    filterVal: filterVal ?? null,
+    limit: limit ?? null,
+  });
 }
