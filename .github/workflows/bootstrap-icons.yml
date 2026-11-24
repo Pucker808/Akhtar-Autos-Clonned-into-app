@@ -4,8 +4,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - "tools/icon-assets.b64.json"
-      - "tools/write_icons.py"
+      - "tools/generate_icons.py"
       - ".github/workflows/bootstrap-icons.yml"
 
 permissions:
@@ -16,8 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Decode icons into src-tauri/icons
-        run: python3 tools/write_icons.py
+      - name: Generate icons
+        run: python3 tools/generate_icons.py
       - name: Commit icons if needed
         run: |
           git config user.name "github-actions[bot]"
@@ -26,6 +25,6 @@ jobs:
           if git diff --staged --quiet; then
             echo "Icons already up to date."
           else
-            git commit -m "chore: materialize Tauri app icons from tools/icon-assets.b64.json"
+            git commit -m "chore: generate Tauri Windows app icons"
             git push
           fi
