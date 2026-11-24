@@ -1,1 +1,64 @@
-# Akhtar-Autos-Clonned-into-app
+# Akhtar Autos Desktop
+
+Standalone Windows desktop application for **Akhtar Autos** — inventory, POS, purchases, customers, suppliers, expenses and reports for an automobile spare-parts shop.
+
+This repository is **independent** of the original web application:
+
+| | Web (original) | Desktop (this repo) |
+|---|---|---|
+| Repository | [akhtar-autoparts-manager](https://github.com/Pucker808/akhtar-autoparts-manager) | [Akhtar-Autos-Clonned-into-app](https://github.com/Pucker808/Akhtar-Autos-Clonned-into-app) |
+| Runtime | Browser / PWA (Vercel) | Tauri 2 native window |
+| Primary storage | IndexedDB (Dexie) | SQLite (hybrid folder architecture) |
+| Target | Web | Windows 10/11 first; Android later |
+
+The original web app remains untouched and operational.
+
+## Architecture
+
+- **Frontend:** React 19 + TypeScript (adapted from the web app)
+- **Desktop shell:** Tauri 2
+- **Native backend:** Rust
+- **Database:** SQLite with user-configurable primary data folder
+- **Backups:** Local automatic + manual; optional Google Drive later
+- **Offline-first:** All core shop workflows work without internet
+
+### Hybrid storage (design)
+
+Default primary database location (Windows):
+
+```
+%LOCALAPPDATA%\AkhtarAutos\Database\akhtar-autos.db
+```
+
+Users can choose a custom folder for the database and a separate folder for backups. The app must never silently create an empty database when an existing one is missing or inaccessible — recovery UI is required.
+
+## Development
+
+### Prerequisites (Windows)
+
+- Node.js 20+
+- Rust (https://rustup.rs) — use a recent stable (1.80+)
+- Microsoft C++ Build Tools / Visual Studio Build Tools
+- WebView2 (usually preinstalled on Windows 10/11)
+
+### Commands
+
+```bash
+npm install
+npm run dev              # frontend only (Vite)
+npm run test             # unit tests
+npm run desktop:dev      # Tauri + frontend
+npm run desktop:build    # Windows installer under src-tauri/target/release/bundle/
+```
+
+## Phase status
+
+- [x] Phase 1 foundation: separate repo, frontend seed, Tauri 2 scaffold, SQLite/storage design
+- [ ] Phase 2–3: full SQLite migration of business ops
+- [ ] Phase 4–5: hybrid folder config, backup/restore, recovery UI
+- [ ] Phase 6–9: feature verification, installer, release
+- [ ] Phase 10: Android (after Windows is solid)
+
+## License / ownership
+
+Shop software for the owner of Akhtar Autos. Do not commit real shop data, secrets, or OAuth client secrets.

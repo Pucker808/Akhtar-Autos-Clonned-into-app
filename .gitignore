@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+.bun/
+
+# Build
+dist/
+dist-ssr/
+*.local
+.output/
+.vinxi/
+.nitro/
+
+# Tauri / Rust
+src-tauri/target/
+src-tauri/Cargo.lock
+src-tauri/gen/
+src-tauri/WixTools/
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+
+# IDE / OS
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+*.log
+
+# Test / coverage
+coverage/
+*.lcov
+
+# Local databases & backups (never commit real shop data)
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+akhtar-autos-backup*.json
+/data/
+/Backups/
+
+# Lovable (web-only; not used in desktop)
+.lovable/
