@@ -1,41 +1,32 @@
 import { db } from "./db";
 
 export interface Settings {
-  shopName: string; phone?: string; address?: string; receiptFooter?: string; returnPolicy?: string;
-  taxEnabled: boolean; taxPct: number; allowNegativeStock: boolean; costing: "fifo";
-  defaultLocationId?: number; currency: "PKR"; timezone: "Asia/Karachi";
-  theme: "light" | "dark" | "system";
+  shopName: string; phone?: string; address?: string; receiptFooter: string;
+  taxEnabled: boolean; taxPct: number; allowNegativeStock: boolean; costing: "FIFO";
+  defaultLocationId?: number; receiptFormat: "thermal" | "a4"; setupDone: boolean;
+  lowStockDefault: number; demoData?: boolean;
 }
-
-const defaults: Settings = {
-  shopName: "Akhtar Autos", taxEnabled: false, taxPct: 0, allowNegativeStock: false, costing: "fifo",
-  currency: "PKR", timezone: "Asia/Karachi", theme: "system",
+export const DEFAULT_SETTINGS: Settings = {
+  shopName: "Akhtar Autos", receiptFooter: "Thank you for shopping at Akhtar Autos. Returns accepted within 7 days with receipt.",
+  taxEnabled: false, taxPct: 0, allowNegativeStock: false, costing: "FIFO", receiptFormat: "thermal",
+  setupDone: false, lowStockDefault: 5,
 };
-
 export async function getSettings(): Promise<Settings> {
-  const row = await db.meta.get("settings");
-  return { ...defaults, ...((row?.value as object) ?? {}) };
+  const m = await db.meta.get("settings");
+  return { ...DEFAULT_SETTINGS, ...((m?.value as Partial<Settings>) ?? {}) };
 }
-
-export async function saveSettings(partial: Partial<Settings>) {
+export async function saveSettings(patch: Partial<Settings>) {
   const cur = await getSettings();
-  await db.meta.put({ key: "settings", value: { ...cur, ...partial } });
+  await db.meta.put({ key: "settings", value: { ...cur, ...patch } });
 }
 
-let _deviceId: string | null = null;
-export function deviceIdSync(): string {
-  if (_deviceId) return _deviceId;
-  try {
-    const k = "akhtar-device-id";
-    let id = localStorage.getItem(k);
-    if (!id) { id = crypto.randomUUID(); localStorage.setItem(k, id); }
-    _deviceId = id;
-    return id;
-  } catch {
-    _deviceId = "unknown";
-    return _deviceId;
-  }
+let cachedDevice: string | null = null;
+export async function getDeviceId(): Promise<string> {
+  if (cachedDevice) return cachedDevice;
+  const m = await db.meta.get("deviceId");
+  if (m?.value) return (cachedDevice = m.value as string);
+  const id = "dev-" + (globalThis.crypto?.randomUUID?.() ?? String(Date.now()) + Math.random().toString(36).slice(2));
+  await db.meta.put({ key: "deviceId", value: id });
+  return (cachedDevice = id);
 }
-export async function getDeviceId() {
-  return deviceIdSync();
-}
+export function deviceIdSync() { return cachedDevice ?? "unknown"; }
