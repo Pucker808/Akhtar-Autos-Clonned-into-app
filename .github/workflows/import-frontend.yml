@@ -24,29 +24,14 @@ jobs:
           path: web
 
       - name: Copy frontend sources without wiping desktop files
-        working-directory: ${
-{ github.workspace }}
         run: |
           set -euo pipefail
           DESKTOP="$GITHUB_WORKSPACE/desktop"
           WEB="$GITHUB_WORKSPACE/web"
 
-          # Never touch these desktop-owned paths
-          PROTECT=(
-            "src-tauri"
-            "package.json"
-            "README.md"
-            ".gitignore"
-            "docs/ARCHITECTURE.md"
-            "docs/PHASE1.md"
-            "docs/SQLITE_MIGRATION.md"
-            ".github"
-            "tools"
-            "vite.config.ts"
-          )
-
           mkdir -p "$DESKTOP/src" "$DESKTOP/public" "$DESKTOP/docs"
 
+          # Per-area rsync WITHOUT --delete so desktop-only files under src/ survive
           rsync -a "$WEB/src/components/" "$DESKTOP/src/components/"
           rsync -a "$WEB/src/hooks/" "$DESKTOP/src/hooks/"
           rsync -a "$WEB/src/lib/" "$DESKTOP/src/lib/"
@@ -54,6 +39,7 @@ jobs:
           rsync -a "$WEB/src/test/" "$DESKTOP/src/test/"
           rsync -a "$WEB/public/" "$DESKTOP/public/"
 
+          # Shared single files (never package.json, vite.config.ts, README, src-tauri)
           for f in src/styles.css src/router.tsx src/routeTree.gen.ts src/server.ts src/start.ts \
                    components.json eslint.config.js .prettierrc .prettierignore bunfig.toml; do
             if [ -f "$WEB/$f" ]; then
@@ -62,12 +48,13 @@ jobs:
             fi
           done
 
-          echo "Protected paths left untouched:"
-          for p in "${PROTECT[@]}"; do echo " - $p"; done
+          test -f "$DESKTOP/src-tauri/tauri.conf.json"
+          test -f "$DESKTOP/package.json"
+          test -f "$DESKTOP/vite.config.ts"
+          echo "Import complete. Desktop-owned package.json, vite.config.ts, src-tauri preserved."
 
       - name: Commit if changed
-        working-directory: ${
-{ github.workspace }}/desktop
+        working-directory: desktop
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
