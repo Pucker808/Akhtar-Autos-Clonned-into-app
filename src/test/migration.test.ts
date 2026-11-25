@@ -82,30 +82,30 @@ describe("export + transform preserves counts and IDs", () => {
     expect(snap.counts.batches).toBeGreaterThanOrEqual(1);
 
     const sqlTables = transformSnapshotForSqlite(snap);
-    expect(sqlTables.items.length).toBe(snap.counts.items);
-    expect(sqlTables.sales.length).toBe(1);
-    expect(sqlTables.sale_returns).toEqual([]);
+    expect(sqlTables["items"].length).toBe(snap.counts.items);
+    expect(sqlTables["sales"].length).toBe(1);
+    expect(sqlTables["sale_returns"]).toEqual([]);
     // IDs preserved
-    const itemRow = sqlTables.items.find((r) => r.sku === "BP-1");
+    const itemRow = sqlTables["items"].find((r) => r.sku === "BP-1");
     expect(itemRow?.id).toBe(item);
     // lines_json present
-    expect(typeof sqlTables.sales[0]!.lines_json).toBe("string");
+    expect(typeof sqlTables["sales"][0]!.lines_json).toBe("string");
 
     const cmp = compareCounts(snap.counts, {
-      meta: sqlTables.meta.length,
-      locations: sqlTables.locations.length,
-      customers: sqlTables.customers.length,
-      suppliers: sqlTables.suppliers.length,
-      items: sqlTables.items.length,
-      batches: sqlTables.batches.length,
-      ledger: sqlTables.ledger.length,
-      sales: sqlTables.sales.length,
-      sale_returns: sqlTables.sale_returns.length,
-      purchases: sqlTables.purchases.length,
-      purchase_returns: sqlTables.purchase_returns.length,
-      payments: sqlTables.payments.length,
-      expenses: sqlTables.expenses.length,
-      audit: sqlTables.audit.length,
+      meta: sqlTables["meta"].length,
+      locations: sqlTables["locations"].length,
+      customers: sqlTables["customers"].length,
+      suppliers: sqlTables["suppliers"].length,
+      items: sqlTables["items"].length,
+      batches: sqlTables["batches"].length,
+      ledger: sqlTables["ledger"].length,
+      sales: sqlTables["sales"].length,
+      sale_returns: sqlTables["sale_returns"].length,
+      purchases: sqlTables["purchases"].length,
+      purchase_returns: sqlTables["purchase_returns"].length,
+      payments: sqlTables["payments"].length,
+      expenses: sqlTables["expenses"].length,
+      audit: sqlTables["audit"].length,
     });
     expect(cmp.ok).toBe(true);
   });

@@ -5,7 +5,29 @@
  */
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
-const host = process.env.TAURI_DEV_HOST;
+const host = process.env["TAURI_DEV_HOST"];
+
+const server: {
+  port: number;
+  strictPort: true;
+  host: string | false;
+  watch: { ignored: string[] };
+  hmr?: { protocol: string; host: string; port: number };
+} = {
+  port: 5173,
+  strictPort: true,
+  host: host || false,
+  watch: {
+    ignored: ["**/src-tauri/**"],
+  },
+};
+if (host) {
+  server.hmr = {
+    protocol: "ws",
+    host,
+    port: 1421,
+  };
+}
 
 export default defineConfig({
   tanstackStart: {
@@ -15,21 +37,7 @@ export default defineConfig({
   vite: {
     clearScreen: false,
     envPrefix: ["VITE_", "TAURI_"],
-    server: {
-      port: 5173,
-      strictPort: true,
-      host: host || false,
-      hmr: host
-        ? {
-            protocol: "ws",
-            host,
-            port: 1421,
-          }
-        : undefined,
-      watch: {
-        ignored: ["**/src-tauri/**"],
-      },
-    },
+    server,
     build: {
       outDir: "dist",
       emptyOutDir: true,
