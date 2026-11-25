@@ -11,6 +11,7 @@ import { ReceiptStudio } from "../components/receipt-studio";
 import { getAppTheme, saveAppTheme, getReceiptDesign, renderReceiptHtml, type AppTheme } from "../lib/receipt";
 import { getSettings } from "../lib/settings";
 import { askText, askConfirm, printHtml } from "@/lib/ui-dialogs";
+import { saveTextFile } from "@/lib/save-file";
 
 // Dexie/IndexedDB UI: render only in the client, matching the static SPA shell.
 export const Route = createFileRoute("/")({ ssr: false, component: Index });
@@ -383,7 +384,7 @@ function Index() {
                 <button disabled={!driveConnected} className="rounded border px-4 py-2 disabled:opacity-40" onClick={() => { void (async () => { if (!(await askConfirm("Drive backup will replace all records on this device. Download a local backup first. Continue?"))) return;  try { const t = await restoreDriveBackup(); setLastDriveSync(t); setDriveStatus("Restore complete"); await refresh(); } catch (e) { setDriveStatus(e instanceof Error ? e.message : String(e)); } })(); }}>Import / Restore from Drive</button>
               </div>
             </Panel>
-            <Panel title="Local backup"><p className="mb-3 text-sm">Download a JSON copy of this device's database.</p><button className="rounded bg-amber-500 px-4 py-2" onClick={() => void (async () => { const names = ["items", "locations", "batches", "ledger", "customers", "suppliers", "sales", "saleReturns", "purchases", "purchaseReturns", "payments", "expenses", "audit", "meta"]; const data: any = { app: "Akhtar Autos", version: 1 }; for (const n of names) data[n] = await db.table(n).toArray(); const url = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: "application/json" })); const a = document.createElement("a"); a.href = url; a.download = "akhtar-autos-backup.json"; a.click(); URL.revokeObjectURL(url); })()}>Download backup</button></Panel>
+            <Panel title="Local backup"><p className="mb-3 text-sm">Download a JSON copy of this device's database.</p><button className="rounded bg-amber-500 px-4 py-2" onClick={() => void (async () => { const names = ["items", "locations", "batches", "ledger", "customers", "suppliers", "sales", "saleReturns", "purchases", "purchaseReturns", "payments", "expenses", "audit", "meta"]; const data: any = { app: "Akhtar Autos", version: 1 }; for (const n of names) data[n] = await db.table(n).toArray(); try { await saveTextFile("akhtar-autos-backup.json", JSON.stringify(data)); } catch (e) { setMsg("Backup was not saved: " + (e instanceof Error ? e.message : String(e))); } })()}>Download backup</button></Panel>
           </div>}
         </div>
       </main>
