@@ -171,7 +171,7 @@ function Index() {
       const id = await postSale({
         lines: saleLines.map((l) => ({ itemId: l.itemId, qty: l.qty, price: toPaisa(l.rateRs || "0"), discount: 0 })),
         discount: saleDisc,
-        customerId: customer?.id,
+        ...(customer?.id !== undefined ? { customerId: customer.id } : {}),
         paid,
         method: paid === 0 ? "credit" : method,
         locationId: saleLoc || locs[0]?.id || 1,
@@ -254,7 +254,11 @@ function Index() {
 
   async function openReceipt(s: Sale) {
     const [design, settings] = await Promise.all([getReceiptDesign(), getSettings()]);
-    const html = renderReceiptHtml(s, design, { shopName: settings.shopName, phone: settings.phone, address: settings.address });
+    const html = renderReceiptHtml(s, design, {
+      shopName: settings.shopName,
+      ...(settings.phone !== undefined ? { phone: settings.phone } : {}),
+      ...(settings.address !== undefined ? { address: settings.address } : {}),
+    });
     try {
       printHtml(html);
     } catch (e) {

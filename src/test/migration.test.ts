@@ -36,17 +36,17 @@ describe("dexieRowToSqlite mapping", () => {
       total: 200,
       paid: 100,
     });
-    expect(row.invoice_no).toBe("AA-1");
-    expect(row.customer_id).toBe(2);
-    expect(typeof row.lines_json).toBe("string");
-    expect(JSON.parse(row.lines_json as string)[0].itemId).toBe(1);
-    expect(row.total).toBe(200);
+    expect(row["invoice_no"]).toBe("AA-1");
+    expect(row["customer_id"]).toBe(2);
+    expect(typeof row["lines_json"]).toBe("string");
+    expect(JSON.parse(row["lines_json"] as string)[0].itemId).toBe(1);
+    expect(row["total"]).toBe(200);
   });
 
   it("maps booleans to 0/1", () => {
     const row = dexieRowToSqlite("items", { id: 1, name: "A", sku: "S", archived: true, unit: "pc", reorderLevel: 0, cost: 0, price: 0 });
-    expect(row.archived).toBe(1);
-    expect(row.reorder_level).toBe(0);
+    expect(row["archived"]).toBe(1);
+    expect(row["reorder_level"]).toBe(0);
   });
 });
 
@@ -77,19 +77,19 @@ describe("export + transform preserves counts and IDs", () => {
 
     const snap = await exportDexieSnapshot();
     expect(snap.source).toBe("dexie");
-    expect(snap.counts.items).toBeGreaterThanOrEqual(1);
-    expect(snap.counts.sales).toBe(1);
-    expect(snap.counts.batches).toBeGreaterThanOrEqual(1);
+    expect(snap.counts["items"]).toBeGreaterThanOrEqual(1);
+    expect(snap.counts["sales"]).toBe(1);
+    expect(snap.counts["batches"]).toBeGreaterThanOrEqual(1);
 
     const sqlTables = transformSnapshotForSqlite(snap);
-    expect(sqlTables.items.length).toBe(snap.counts.items);
+    expect(sqlTables.items.length).toBe(snap.counts["items"]);
     expect(sqlTables.sales.length).toBe(1);
     expect(sqlTables.sale_returns).toEqual([]);
     // IDs preserved
-    const itemRow = sqlTables.items.find((r) => r.sku === "BP-1");
-    expect(itemRow?.id).toBe(item);
+    const itemRow = sqlTables.items.find((r) => r["sku"] === "BP-1");
+    expect(itemRow?.["id"]).toBe(item);
     // lines_json present
-    expect(typeof sqlTables.sales[0]!.lines_json).toBe("string");
+    expect(typeof sqlTables.sales[0]!["lines_json"]).toBe("string");
 
     const cmp = compareCounts(snap.counts, {
       meta: sqlTables.meta.length,

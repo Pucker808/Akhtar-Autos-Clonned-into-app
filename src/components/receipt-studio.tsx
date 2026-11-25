@@ -37,8 +37,10 @@ export function ReceiptStudio({ onSaved }: { onSaved?: (msg: string) => void }) 
   }
 
   async function save() {
-    await saveReceiptDesign(design);
-    await saveSettings({ shopName: shopName.trim() || "Akhtar Autos", phone, address, receiptFooter: design.footerText, receiptFormat: design.paper });
+    const currentDesign = design;
+    if (!currentDesign) return;
+    await saveReceiptDesign(currentDesign);
+    await saveSettings({ shopName: shopName.trim() || "Akhtar Autos", phone, address, receiptFooter: currentDesign.footerText, receiptFormat: currentDesign.paper });
     setSavedMsg("Default receipt saved. New and old invoices both use this design.");
     onSaved?.("Receipt design saved.");
   }

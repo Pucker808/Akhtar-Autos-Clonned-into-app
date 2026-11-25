@@ -81,7 +81,9 @@ export async function exportDexieSnapshot(): Promise<DexieSnapshot> {
   const tables: Record<string, Record<string, unknown>[]> = {};
   const counts: Record<string, number> = {};
   for (const name of DATA_TABLES) {
-    const rows = await (db as unknown as Record<string, { toArray: () => Promise<Record<string, unknown>[]> }>)[name].toArray();
+    const table = (db as unknown as Record<string, { toArray: () => Promise<Record<string, unknown>[]> }>)[name];
+    if (!table) throw new Error(`Missing Dexie table: ${name}`);
+    const rows = await table.toArray();
     tables[name] = rows;
     counts[name] = rows.length;
   }
@@ -91,16 +93,14 @@ export async function exportDexieSnapshot(): Promise<DexieSnapshot> {
 /** Transform Dexie snapshot tables into SQLite-shaped tables. */
 export function transformSnapshotForSqlite(
   snapshot: DexieSnapshot,
-): Record<string, Record<string, unknown>[]> {
-  const out: Record<string, Record<string, unknown>[]> = {};
+): Record<SqliteTableName, Record<string, unknown>[]> {
+  const out = Object.fromEntries(
+    SQLITE_TABLE_ORDER.map((table) => [table, [] as Record<string, unknown>[]]),
+  ) as Record<SqliteTableName, Record<string, unknown>[]>;
   for (const [dexieName, rows] of Object.entries(snapshot.tables)) {
     const sqlName = DEXIE_TO_SQLITE[dexieName];
     if (!sqlName) continue;
     out[sqlName] = rows.map((r) => dexieRowToSqlite(dexieName, r));
-  }
-  // Ensure empty arrays for missing tables so import order is complete
-  for (const t of SQLITE_TABLE_ORDER) {
-    if (!out[t]) out[t] = [];
   }
   return out;
 }

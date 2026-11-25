@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   getPersistenceMode,
   setPersistenceMode,
@@ -14,12 +14,17 @@ describe("persistence mode", () => {
     setConfiguredSqlitePath(null);
   });
 
+  afterEach(() => {
+    Reflect.deleteProperty(window, "__TAURI_INTERNALS__");
+  });
+
   it("defaults to dexie outside forced session", () => {
     expect(getPersistenceMode()).toBe("dexie");
     expect(isSqliteMode()).toBe(false);
   });
 
   it("can select sqlite mode for adapter tests without dual-write", () => {
+    Object.defineProperty(window, "__TAURI_INTERNALS__", { value: {}, configurable: true });
     setPersistenceMode("sqlite");
     expect(getPersistenceMode()).toBe("sqlite");
     expect(isSqliteMode()).toBe(true);
