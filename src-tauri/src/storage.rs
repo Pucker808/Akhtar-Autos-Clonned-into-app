@@ -12,7 +12,7 @@
 //! Database location and backup location are independently configurable.
 //! Never invent a new empty database when the configured path is missing.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -30,20 +30,14 @@ pub fn default_data_root() -> Result<PathBuf, StorageError> {
 }
 
 pub fn default_database_path() -> Result<PathBuf, StorageError> {
-    Ok(default_data_root()?.join("Database").join("akhtar-autos.db"))
-}
-
-pub fn default_backups_dir() -> Result<PathBuf, StorageError> {
-    Ok(default_data_root()?.join("Backups"))
-}
-
-pub fn default_settings_path() -> Result<PathBuf, StorageError> {
-    Ok(default_data_root()?.join("Settings").join("app-settings.json"))
+    Ok(default_data_root()?
+        .join("Database")
+        .join("akhtar-autos.db"))
 }
 
 /// Ensure the *directory tree* exists for a chosen data root.
 /// Does **not** create a database file.
-pub fn ensure_data_layout(root: &PathBuf) -> Result<(), StorageError> {
+pub fn ensure_data_layout(root: &Path) -> Result<(), StorageError> {
     for sub in [
         "Database",
         "Attachments/Product Images",

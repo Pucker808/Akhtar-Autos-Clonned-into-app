@@ -1,6 +1,6 @@
 /**
  * Akhtar Autos Desktop — Vite config for Tauri WebView.
- * Outputs static assets to dist/ (see src-tauri/tauri.conf.json frontendDist).
+ * Outputs static assets to dist/client (see src-tauri/tauri.conf.json frontendDist).
  * Desktop-specific overrides live here; the original web app is untouched.
  */
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
@@ -30,17 +30,19 @@ if (host) {
 }
 
 export default defineConfig({
+  // Tauri has no Node/Worker server: skip the Nitro (Cloudflare) deploy build.
+  nitro: false,
   tanstackStart: {
-    // Existing server entry kept for Start compatibility; Tauri serves the client build only.
+    // Used at build time to prerender the static shell.
     server: { entry: "server" },
+    // SPA mode: emit a static index.html that renders entirely in the WebView.
+    spa: { enabled: true, prerender: { outputPath: "/index.html" } },
   },
   vite: {
     clearScreen: false,
     envPrefix: ["VITE_", "TAURI_"],
     server,
     build: {
-      outDir: "dist",
-      emptyOutDir: true,
       target: "esnext",
     },
   },

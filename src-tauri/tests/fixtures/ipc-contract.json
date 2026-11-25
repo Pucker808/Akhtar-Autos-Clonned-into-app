@@ -1,0 +1,161 @@
+[
+  {
+    "cmd": "get_default_database_path",
+    "args": {}
+  },
+  {
+    "cmd": "get_default_data_root",
+    "args": {}
+  },
+  {
+    "cmd": "ensure_data_layout",
+    "args": {
+      "root": "$DIR/root"
+    }
+  },
+  {
+    "cmd": "create_database",
+    "args": {
+      "path": "$DIR/contract.db",
+      "confirmCreate": true
+    }
+  },
+  {
+    "cmd": "check_database_path",
+    "args": {
+      "path": "$DIR/contract.db"
+    }
+  },
+  {
+    "cmd": "get_schema_info",
+    "args": {
+      "path": "$DIR/contract.db"
+    }
+  },
+  {
+    "cmd": "get_table_counts",
+    "args": {
+      "path": "$DIR/contract.db"
+    }
+  },
+  {
+    "cmd": "get_meta_value",
+    "args": {
+      "path": "$DIR/contract.db",
+      "key": "app"
+    }
+  },
+  {
+    "cmd": "import_db_snapshot",
+    "args": {
+      "path": "$DIR/contract.db",
+      "tables": {
+        "locations": [
+          {
+            "id": 1,
+            "name": "Main",
+            "type": "shop",
+            "created_at": 1,
+            "updated_at": 1,
+            "device_id": "d"
+          }
+        ]
+      },
+      "confirmOverwrite": false
+    }
+  },
+  {
+    "cmd": "apply_db_mutations",
+    "args": {
+      "path": "$DIR/contract.db",
+      "requestId": "req-1",
+      "mutations": [
+        {
+          "op": "insert",
+          "table": "locations",
+          "row": {
+            "name": "Main",
+            "type": "shop",
+            "created_at": 1,
+            "updated_at": 1,
+            "device_id": "d"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "cmd": "export_db_table",
+    "args": {
+      "path": "$DIR/contract.db",
+      "table": "locations"
+    }
+  },
+  {
+    "cmd": "query_batches_fifo",
+    "args": {
+      "path": "$DIR/contract.db",
+      "itemId": 1,
+      "locationId": 1
+    }
+  },
+  {
+    "cmd": "query_stock_qty",
+    "args": {
+      "path": "$DIR/contract.db",
+      "itemId": 1,
+      "locationId": null
+    }
+  },
+  {
+    "cmd": "query_stock_qty",
+    "args": {
+      "path": "$DIR/contract.db",
+      "itemId": 1,
+      "locationId": 1
+    }
+  },
+  {
+    "cmd": "get_db_row",
+    "args": {
+      "path": "$DIR/contract.db",
+      "table": "locations",
+      "id": 1
+    }
+  },
+  {
+    "cmd": "list_db_rows",
+    "args": {
+      "path": "$DIR/contract.db",
+      "table": "locations",
+      "filterCol": null,
+      "filterVal": null,
+      "limit": null
+    }
+  },
+  {
+    "cmd": "list_db_rows",
+    "args": {
+      "path": "$DIR/contract.db",
+      "table": "locations",
+      "filterCol": "name",
+      "filterVal": "Main",
+      "limit": 5
+    }
+  },
+  {
+    "cmd": "backup_database",
+    "args": {
+      "source": "$DIR/contract.db",
+      "destination": "$DIR/backup.db"
+    }
+  },
+  {
+    "cmd": "restore_database",
+    "args": {
+      "backupPath": "$DIR/backup.db",
+      "targetPath": "$DIR/contract.db",
+      "confirmRestore": true
+    }
+  }
+]

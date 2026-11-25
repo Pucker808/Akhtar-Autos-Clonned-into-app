@@ -1,6 +1,6 @@
 import { db, DATA_TABLES } from "./db";
 
-const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
+const CLIENT_ID = import.meta.env["VITE_GOOGLE_CLIENT_ID"] as string | undefined;
 const FOLDER_NAME = "Akhtar Autos Data";
 const BACKUP_NAME = "akhtar-autos-backup.json";
 const SCOPE = "https://www.googleapis.com/auth/drive.file";
@@ -15,7 +15,7 @@ function loadScript(src: string) {
     if (document.querySelector('script[data-google-identity]')) { resolve(); return; }
     const script = document.createElement("script");
     script.src = src; script.async = true; script.defer = true;
-    script.dataset.googleIdentity = "true";
+    script.dataset["googleIdentity"] = "true";
     script.onload = () => resolve(); script.onerror = () => reject(new Error("Google sign-in library load nahi hui."));
     document.head.appendChild(script);
   });
@@ -82,7 +82,7 @@ async function api(path: string, init: RequestInit = {}) {
 async function findOrCreateFolder(): Promise<string> {
   const q = encodeURIComponent("name='" + FOLDER_NAME + "' and mimeType='application/vnd.google-apps.folder' and trashed=false");
   const found = await (await api("files?q=" + q + "&fields=files(id,name)&pageSize=10")).json();
-  if (found.files?.length) return (found.files as DriveFile[])[0].id;
+  if (found.files?.length) return (found.files as DriveFile[])[0]!.id;
   const created = await (await api("files?fields=id", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: FOLDER_NAME, mimeType: "application/vnd.google-apps.folder" }) })).json();
   return created.id as string;
 }

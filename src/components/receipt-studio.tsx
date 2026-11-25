@@ -26,7 +26,8 @@ export function ReceiptStudio({ onSaved }: { onSaved?: (msg: string) => void }) 
   const html = previewSaleFrom(design, { shopName, phone, address });
 
   function move(id: SectionId, dir: -1 | 1) {
-    const list = [...design!.sections];
+    if (!design) return;
+    const list = [...design.sections];
     const i = list.indexOf(id);
     const j = i + dir;
     if (i < 0 || j < 0 || j >= list.length) return;
@@ -37,6 +38,7 @@ export function ReceiptStudio({ onSaved }: { onSaved?: (msg: string) => void }) 
   }
 
   async function save() {
+    if (!design) return;
     await saveReceiptDesign(design);
     await saveSettings({ shopName: shopName.trim() || "Akhtar Autos", phone, address, receiptFooter: design.footerText, receiptFormat: design.paper });
     setSavedMsg("Default receipt saved. New and old invoices both use this design.");

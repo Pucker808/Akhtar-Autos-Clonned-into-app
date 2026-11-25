@@ -9,10 +9,35 @@
 use rusqlite::{Connection, OpenFlags, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 use thiserror::Error;
 
 /// Current schema version. Bump only with a migration path.
 pub const SCHEMA_VERSION: i64 = 1;
+
+/// Value of `meta.app` that identifies a database owned by this application.
+pub const APP_ID: &str = "Akhtar Autos Desktop";
+
+/// Tables of schema v1, in foreign-key-safe insert order.
+pub const TABLES: &[&str] = &[
+    "meta",
+    "locations",
+    "customers",
+    "suppliers",
+    "items",
+    "batches",
+    "ledger",
+    "sales",
+    "sale_returns",
+    "purchases",
+    "purchase_returns",
+    "payments",
+    "expenses",
+    "audit",
+];
+
+/// SQLite sidecar files that belong to a database file.
+pub const SIDECARS: &[&str] = &["-wal", "-shm", "-journal"];
 
 #[derive(Debug, Error)]
 pub enum DbError {
@@ -30,6 +55,8 @@ pub enum DbError {
     Sqlite(#[from] rusqlite::Error),
     #[error("integrity check failed: {0}")]
     Integrity(String),
+    #[error("not an Akhtar Autos database: {0}")]
+    NotAkhtarDatabase(String),
     #[error("schema version mismatch: found {found}, expected {expected}")]
     SchemaMismatch { found: i64, expected: i64 },
     #[error("io error: {0}")]
@@ -87,33 +114,42 @@ pub fn check_path(path: &str) -> Result<DbHealth, DbError> {
     }
     let size_bytes = std::fs::metadata(p)?.len();
 
-    let conn = Connection::open_with_flags(p, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
-
-    let integrity: String = conn.query_row("PRAGMA integrity_check", [], |r| r.get(0))?;
-    let integrity_ok = integrity.eq_ignore_ascii_case("ok");
-
-    let schema_version = read_schema_version(&conn);
-
-    let table_counts = if integrity_ok {
-        Some(count_all_tables(&conn)?)
-    } else {
-        None
-    };
-
-    Ok(DbHealth {
+    // A corrupt or foreign file is a recoverable *state*, not a command failure:
+    // report it so the recovery UI can act on it.
+    let unhealthy = |message: String| DbHealth {
         path: path.to_string(),
         exists: true,
         is_file: true,
         size_bytes,
-        integrity_ok,
-        schema_version,
-        table_counts,
-        message: if integrity_ok {
-            "Database is readable and integrity check passed.".into()
-        } else {
-            format!("Integrity check reported: {integrity}")
-        },
-    })
+        integrity_ok: false,
+        schema_version: None,
+        table_counts: None,
+        message,
+    };
+
+    let inspected = (|| -> Result<DbHealth, DbError> {
+        let conn = Connection::open_with_flags(p, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+        conn.busy_timeout(Duration::from_secs(5))?;
+        let integrity: String = conn.query_row("PRAGMA integrity_check", [], |r| r.get(0))?;
+        if !integrity.eq_ignore_ascii_case("ok") {
+            return Ok(unhealthy(format!("Integrity check reported: {integrity}")));
+        }
+        let message = match verify_app_schema(&conn) {
+            Ok(()) => "Database is readable and integrity check passed.".to_string(),
+            Err(e) => format!("Integrity check passed, but this file cannot be used: {e}"),
+        };
+        Ok(DbHealth {
+            integrity_ok: true,
+            schema_version: read_schema_version(&conn),
+            table_counts: Some(count_all_tables(&conn)?),
+            ..unhealthy(message)
+        })
+    })();
+
+    match inspected {
+        Ok(health) => Ok(health),
+        Err(e) => Ok(unhealthy(format!("Database could not be read: {e}"))),
+    }
 }
 
 fn read_schema_version(conn: &Connection) -> Option<i64> {
@@ -124,28 +160,45 @@ fn read_schema_version(conn: &Connection) -> Option<i64> {
     )
     .ok()
     .and_then(|s| s.parse().ok())
-    .or_else(|| conn.query_row("PRAGMA user_version", [], |r| r.get(0)).ok())
+}
+
+/// Refuse to operate on anything that is not a complete schema-v1 database of this app.
+pub fn verify_app_schema(conn: &Connection) -> Result<(), DbError> {
+    for table in TABLES {
+        let found: Option<i64> = conn
+            .query_row(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?1",
+                [table],
+                |r| r.get(0),
+            )
+            .optional()?;
+        if found.is_none() {
+            return Err(DbError::NotAkhtarDatabase(format!(
+                "table '{table}' is missing"
+            )));
+        }
+    }
+    let app: Option<String> = conn
+        .query_row("SELECT value FROM meta WHERE key = 'app'", [], |r| r.get(0))
+        .optional()?;
+    if app.as_deref() != Some(APP_ID) {
+        return Err(DbError::NotAkhtarDatabase(
+            "application marker is missing or different".into(),
+        ));
+    }
+    let found = read_schema_version(conn).unwrap_or(0);
+    if found != SCHEMA_VERSION {
+        return Err(DbError::SchemaMismatch {
+            found,
+            expected: SCHEMA_VERSION,
+        });
+    }
+    Ok(())
 }
 
 fn count_all_tables(conn: &Connection) -> Result<std::collections::HashMap<String, i64>, DbError> {
-    let tables = [
-        "meta",
-        "items",
-        "locations",
-        "batches",
-        "ledger",
-        "customers",
-        "suppliers",
-        "sales",
-        "sale_returns",
-        "purchases",
-        "purchase_returns",
-        "payments",
-        "expenses",
-        "audit",
-    ];
     let mut map = std::collections::HashMap::new();
-    for t in tables {
+    for t in TABLES {
         let exists: bool = conn
             .query_row(
                 "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?1",
@@ -156,7 +209,7 @@ fn count_all_tables(conn: &Connection) -> Result<std::collections::HashMap<Strin
             .unwrap_or(false);
         if exists {
             let c: i64 = conn.query_row(&format!("SELECT COUNT(*) FROM {t}"), [], |r| r.get(0))?;
-            map.insert(t.to_string(), c);
+            map.insert((*t).to_string(), c);
         }
     }
     Ok(map)
@@ -172,7 +225,9 @@ pub fn open_readonly(path: &str) -> Result<Connection, DbError> {
         return Err(DbError::NotAFile(path.to_string()));
     }
     let conn = Connection::open_with_flags(p, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    conn.busy_timeout(Duration::from_secs(5))?;
     conn.execute_batch("PRAGMA foreign_keys = ON;")?;
+    verify_app_schema(&conn)?;
     Ok(conn)
 }
 
@@ -185,13 +240,11 @@ pub fn open_readwrite(path: &str) -> Result<Connection, DbError> {
     if !p.is_file() {
         return Err(DbError::NotAFile(path.to_string()));
     }
-    let conn = Connection::open_with_flags(
-        p,
-        OpenFlags::SQLITE_OPEN_READ_WRITE,
-    )?;
-    conn.execute_batch(
-        "PRAGMA foreign_keys = ON;\nPRAGMA journal_mode = WAL;\nPRAGMA busy_timeout = 5000;",
-    )?;
+    let conn = Connection::open_with_flags(p, OpenFlags::SQLITE_OPEN_READ_WRITE)?;
+    conn.busy_timeout(Duration::from_secs(5))?;
+    // Verify ownership BEFORE any statement that could modify the file.
+    verify_app_schema(&conn)?;
+    conn.execute_batch("PRAGMA foreign_keys = ON;\nPRAGMA journal_mode = WAL;")?;
     Ok(conn)
 }
 
@@ -211,18 +264,43 @@ pub fn create_new_database(path: &str, confirm_create: bool) -> Result<DbHealth,
         }
     }
 
-    let conn = Connection::open_with_flags(
-        p,
-        OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE,
-    )?;
-    conn.execute_batch(INIT_SCHEMA_SQL)?;
-    conn.execute(
-        "PRAGMA user_version = ?1",
-        [SCHEMA_VERSION],
-    )?;
-    drop(conn);
+    for suffix in SIDECARS {
+        let sidecar = format!("{path}{suffix}");
+        if Path::new(&sidecar).exists() {
+            return Err(DbError::Message(format!(
+                "create refused: leftover file {sidecar} may belong to a lost database; use recovery"
+            )));
+        }
+    }
+
+    // Claim the path atomically so an existing file can never be reused.
+    std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(p)?;
+
+    if let Err(e) = initialize_schema(p) {
+        // Only removes the file created by this call.
+        let _ = std::fs::remove_file(p);
+        for suffix in SIDECARS {
+            let _ = std::fs::remove_file(format!("{path}{suffix}"));
+        }
+        return Err(e);
+    }
 
     check_path(path)
+}
+
+fn initialize_schema(path: &Path) -> Result<(), DbError> {
+    let mut conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_WRITE)?;
+    // journal_mode cannot be changed inside a transaction.
+    conn.execute_batch("PRAGMA journal_mode = WAL;\nPRAGMA foreign_keys = ON;")?;
+    let tx = conn.transaction()?;
+    tx.execute_batch(INIT_SCHEMA_SQL)?;
+    // PRAGMA statements do not accept bound parameters.
+    tx.pragma_update(None, "user_version", SCHEMA_VERSION)?;
+    tx.commit()?;
+    verify_app_schema(&conn)
 }
 
 /// Schema info for an existing DB (read-only).
@@ -261,11 +339,7 @@ pub fn table_counts(path: &str) -> Result<Vec<TableCount>, DbError> {
 pub fn get_meta(path: &str, key: &str) -> Result<Option<String>, DbError> {
     let conn = open_readonly(path)?;
     let v: Option<String> = conn
-        .query_row(
-            "SELECT value FROM meta WHERE key = ?1",
-            [key],
-            |r| r.get(0),
-        )
+        .query_row("SELECT value FROM meta WHERE key = ?1", [key], |r| r.get(0))
         .optional()?;
     Ok(v)
 }
@@ -285,9 +359,6 @@ pub fn ensure_layout_for_root(root: &str) -> Result<(), DbError> {
 
 /// Initial schema SQL. Only invoked from `create_new_database` after confirmation.
 pub const INIT_SCHEMA_SQL: &str = r#"
-PRAGMA journal_mode = WAL;
-PRAGMA foreign_keys = ON;
-
 CREATE TABLE IF NOT EXISTS meta (
   key TEXT PRIMARY KEY NOT NULL,
   value TEXT NOT NULL

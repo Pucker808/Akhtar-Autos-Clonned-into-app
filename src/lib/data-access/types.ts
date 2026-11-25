@@ -32,6 +32,8 @@ export type Mutation = {
 export type TxResult = {
   applied: number;
   lastInsertIds: Record<string, number>;
+  /** True when the request id was already committed; nothing was written again. */
+  duplicate: boolean;
 };
 
 export type ImportReport = {

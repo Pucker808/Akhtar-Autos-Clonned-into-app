@@ -8,7 +8,7 @@ This repository is **independent** of the original web application:
 |---|---|---|
 | Repository | [akhtar-autoparts-manager](https://github.com/Pucker808/akhtar-autoparts-manager) | [Akhtar-Autos-Clonned-into-app](https://github.com/Pucker808/Akhtar-Autos-Clonned-into-app) |
 | Runtime | Browser / PWA (Vercel) | Tauri 2 native window |
-| Primary storage | IndexedDB (Dexie) | SQLite (hybrid folder architecture) |
+| Primary storage | IndexedDB (Dexie) | IndexedDB (Dexie) today; SQLite planned |
 | Target | Web | Windows 10/11 first; Android later |
 
 The original web app remains untouched and operational.
@@ -36,25 +36,29 @@ Users can choose a custom folder for the database and a separate folder for back
 
 ### Prerequisites (Windows)
 
-- Node.js 20+
-- Rust (https://rustup.rs) — use a recent stable (1.80+)
+- Bun 1.4.4 (the only supported package manager; `bun.lock` is committed)
+- Node.js 22+
+- Rust stable (https://rustup.rs); `src-tauri/Cargo.lock` is committed
 - Microsoft C++ Build Tools / Visual Studio Build Tools
 - WebView2 (usually preinstalled on Windows 10/11)
 
 ### Commands
 
 ```bash
-npm install
-npm run dev              # frontend only (Vite)
-npm run test             # unit tests
-npm run desktop:dev      # Tauri + frontend
-npm run desktop:build    # Windows installer under src-tauri/target/release/bundle/
+bun install --frozen-lockfile
+bun run typecheck           # strict TypeScript
+bun run test                # Vitest
+bun run build               # static frontend in dist/client (run before cargo)
+cargo test --manifest-path src-tauri/Cargo.toml --locked
+bun run desktop:dev         # Tauri + frontend
+bun run desktop:build       # installers under src-tauri/target/release/bundle/
 ```
 
 ## Phase status
 
 - [x] Phase 1 foundation: separate repo, frontend seed, Tauri 2 scaffold, SQLite/storage design
-- [ ] Phase 2–3: full SQLite migration of business ops
+- [ ] Phase 2: SQLite foundation (awaiting independent review, see docs/PHASE2.md)
+- [ ] Phase 3: SQLite business operations (not started)
 - [ ] Phase 4–5: hybrid folder config, backup/restore, recovery UI
 - [ ] Phase 6–9: feature verification, installer, release
 - [ ] Phase 10: Android (after Windows is solid)

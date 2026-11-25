@@ -1,67 +1,38 @@
-# Phase 2 TX — Transactional data-access & migration prep
+# Phase 2 TX — transactional layer and migration preparation
 
-**Status:** Implemented behind feature flag. Dexie remains the **default live** store.  
-**No cutover. No Dexie removal.**
+Dexie remains the default and only live store. No UI code calls this layer.
 
-## What was added
+## Commands
 
-### Rust (`src-tauri/src/db_tx.rs` + `lib.rs` commands)
+| Command | Behaviour |
+|---------|-----------|
+| `apply_db_mutations(path, requestId, mutations)` | One `IMMEDIATE` transaction. Any error rolls back all. Update/delete must hit exactly one row. A replayed `requestId` returns the first result with `duplicate: true`; reuse with different content is an error. |
+| `import_db_snapshot(path, tables, confirmOverwrite)` | All-or-nothing. Ids preserved. No row is skipped or replaced. Foreign keys, payment parties and integrity are verified before commit. Overwrite needs confirmation, every table in the snapshot, and first writes a verified `*.pre-import-*` copy. |
+| `backup_database(source, destination)` | SQLite online backup API (includes WAL), verified, never overwrites. |
+| `restore_database(backupPath, targetPath, confirmRestore)` | Stages and verifies a copy, moves the current files to `*.pre-restore-*`, then publishes. |
+| `export_db_table`, `get_db_row`, `list_db_rows`, `query_batches_fifo`, `query_stock_qty` | Read-only. |
 
-| Command | Purpose |
-|---------|---------|
-| `apply_db_mutations` | Ordered insert/update/delete in **one SQLite transaction** (full rollback on error) |
-| `import_db_snapshot` | Bulk import with ID preservation; safety backup when overwriting |
-| `export_db_table` | Read table as JSON rows |
-| `backup_database` | WAL checkpoint + file copy |
-| `restore_database` | Validate backup, safety-rename current, copy (requires `confirm_restore`) |
-| `query_batches_fifo` | Batches for item+location ordered by date/id (remaining > 0) |
-| `query_stock_qty` | Ledger sum |
-| `get_db_row` / `list_db_rows` | Generic reads |
+All database access except `check_database_path` refuses files that are not a
+schema-v1 Akhtar Autos database. Table and column names are validated against the schema.
 
-### Frontend
+## Value rules
 
-| File | Role |
-|------|------|
-| `src/lib/data-access/types.ts` | Mutation, ImportReport, BackupReport, table order |
-| `src/lib/data-access/sqlite-adapter.ts` | All Tauri invokes above |
-| `src/lib/data-access/index.ts` | Facade; `applyMutationsIfSqlite` no-ops unless mode=sqlite |
-| `src/lib/migration.ts` | Dexie export → snake_case transform → import orchestration |
+- INTEGER columns (paisa, epoch ms, ids): integers within JavaScript's safe range; booleans become 0/1.
+- REAL: numbers. TEXT: strings.
+- `lines_json`: a JSON array whose money fields are integers.
 
-### Safety rules (unchanged / strengthened)
+## Migration (`src/lib/migration.ts`)
 
-- Missing DB is **not** treated as empty install.
-- Create requires `confirm_create: true`.
-- Import into non-empty DB requires `confirm_overwrite: true` and creates `*.pre-import-*` safety copy.
-- Restore requires `confirm_restore: true` and renames current to `*.pre-restore-*`.
-- Dexie data is **never** deleted by migration helpers.
+- Exports Dexie in one read transaction and never changes it.
+- Rejects NaN, Infinity and other values JSON would silently alter.
+- Encodes every meta value as JSON; skips the browser-only `localFolderHandle`.
+- Creates a database only with `createIfMissing`; transforms the data first.
+- Compares imported counts with the source and never changes the persistence mode.
 
-## Accounting / FIFO
+## Keeping both sides in step
 
-- **Formulas remain in TypeScript `ops.ts`.**
-- SQLite provides batch FIFO reads and atomic mutation apply so a future sqlite-backed ops path can:
-  1. Read batches via `query_batches_fifo`
-  2. Compute allocs with the same algorithm as `consumeFIFO`
-  3. Submit all resulting row changes via `apply_db_mutations` in one transaction
-
-Live UI still uses Dexie until cutover approval.
-
-## Migration workflow (manual / settings UI later)
-
-1. `exportDexieSnapshot()` — pure Dexie read.
-2. User confirms target path + overwrite if needed.
-3. `importDexieSnapshotToSqlite(snapshot, { confirmOverwrite, createIfMissing })`.
-4. `compareCounts` — verify table row counts.
-5. **Do not** flip `persistenceMode` until operator sign-off.
-
-## Tests
-
-- `src/test/migration.test.ts` — mapping, export, ID preservation, count compare (runs in Node/vitest with fake-indexeddb).
-- Python sqlite3 checks for schema + mutation rollback semantics (environment-local).
-- Full Tauri invoke + Windows installer tests: **not executed in CI sandbox** — run on Windows.
-
-## Explicit non-goals (this stage)
-
-- Default mode still `dexie`.
-- ops.ts not switched to SQLite.
-- No Android.
-- No Google Drive changes.
+- `src-tauri/tests/fixtures/ipc-contract.json`: exact frontend IPC calls, replayed in Rust.
+  After an intended change run `UPDATE_IPC_CONTRACT=1 bunx vitest run src/test/ipc-contract.test.ts`.
+- `migration-snapshot.json`: real `ops.ts` data imported by the Rust tests. CI regenerates it
+  on Linux; the committed copy is the default for local runs and Windows. Regenerate with
+  `MIGRATION_FIXTURE_OUT=$PWD/src-tauri/tests/fixtures/migration-snapshot.json bunx vitest run src/test/migration.test.ts`.

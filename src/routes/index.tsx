@@ -12,7 +12,8 @@ import { getAppTheme, saveAppTheme, getReceiptDesign, renderReceiptHtml, type Ap
 import { getSettings } from "../lib/settings";
 import { askText, askConfirm, printHtml } from "@/lib/ui-dialogs";
 
-export const Route = createFileRoute("/")({ component: Index });
+// Dexie/IndexedDB UI: render only in the client, matching the static SPA shell.
+export const Route = createFileRoute("/")({ ssr: false, component: Index });
 type Tab = "overview" | "inventory" | "sales" | "purchases" | "parties" | "expenses" | "reports" | "settings";
 const tabs: Tab[] = ["overview", "inventory", "sales", "purchases", "parties", "expenses", "reports", "settings"];
 const METHODS: PayMethod[] = ["cash", "bank", "easypaisa", "jazzcash", "credit"];
@@ -171,7 +172,7 @@ function Index() {
       const id = await postSale({
         lines: saleLines.map((l) => ({ itemId: l.itemId, qty: l.qty, price: toPaisa(l.rateRs || "0"), discount: 0 })),
         discount: saleDisc,
-        customerId: customer?.id,
+        ...(customer?.id !== undefined ? { customerId: customer.id } : {}),
         paid,
         method: paid === 0 ? "credit" : method,
         locationId: saleLoc || locs[0]?.id || 1,
@@ -254,7 +255,7 @@ function Index() {
 
   async function openReceipt(s: Sale) {
     const [design, settings] = await Promise.all([getReceiptDesign(), getSettings()]);
-    const html = renderReceiptHtml(s, design, { shopName: settings.shopName, phone: settings.phone, address: settings.address });
+    const html = renderReceiptHtml(s, design, { shopName: settings.shopName, ...(settings.phone !== undefined ? { phone: settings.phone } : {}), ...(settings.address !== undefined ? { address: settings.address } : {}) });
     try {
       printHtml(html);
     } catch (e) {

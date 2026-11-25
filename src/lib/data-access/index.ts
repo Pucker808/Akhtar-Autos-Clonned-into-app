@@ -63,11 +63,12 @@ export async function getActiveTableCounts(): Promise<TableCount[] | null> {
 
 /** Apply mutations only when sqlite mode is active (no dual-write). */
 export async function applyMutationsIfSqlite(
+  requestId: string,
   mutations: Mutation[],
 ): Promise<TxResult | null> {
   if (getPersistenceMode() !== "sqlite" || !isTauriRuntime()) {
     return null;
   }
   const path = await sqlite.resolveSqlitePath();
-  return sqlite.sqliteApplyMutations(path, mutations);
+  return sqlite.sqliteApplyMutations(path, requestId, mutations);
 }

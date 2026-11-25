@@ -59,9 +59,10 @@ fn ensure_data_layout(root: String) -> Result<(), String> {
 #[tauri::command]
 fn apply_db_mutations(
     path: String,
+    request_id: String,
     mutations: Vec<db_tx::Mutation>,
 ) -> Result<db_tx::TxResult, String> {
-    db_tx::apply_mutations(&path, mutations).map_err(|e| e.to_string())
+    db_tx::apply_mutations(&path, &request_id, mutations).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -102,11 +103,7 @@ fn query_batches_fifo(
 }
 
 #[tauri::command]
-fn query_stock_qty(
-    path: String,
-    item_id: i64,
-    location_id: Option<i64>,
-) -> Result<f64, String> {
+fn query_stock_qty(path: String, item_id: i64, location_id: Option<i64>) -> Result<f64, String> {
     db_tx::query_stock_qty(&path, item_id, location_id).map_err(|e| e.to_string())
 }
 
@@ -126,32 +123,38 @@ fn list_db_rows(
     db_tx::list_rows(&path, &table, filter_col, filter_val, limit).map_err(|e| e.to_string())
 }
 
+/// Registers every command. Shared by the app and the IPC contract tests.
+fn with_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
+    builder.invoke_handler(tauri::generate_handler![
+        greet,
+        get_default_data_root,
+        get_default_database_path,
+        check_database_path,
+        create_database,
+        get_schema_info,
+        get_table_counts,
+        get_meta_value,
+        ensure_data_layout,
+        apply_db_mutations,
+        import_db_snapshot,
+        export_db_table,
+        backup_database,
+        restore_database,
+        query_batches_fifo,
+        query_stock_qty,
+        get_db_row,
+        list_db_rows
+    ])
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    with_commands(tauri::Builder::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .invoke_handler(tauri::generate_handler![
-            greet,
-            get_default_data_root,
-            get_default_database_path,
-            check_database_path,
-            create_database,
-            get_schema_info,
-            get_table_counts,
-            get_meta_value,
-            ensure_data_layout,
-            apply_db_mutations,
-            import_db_snapshot,
-            export_db_table,
-            backup_database,
-            restore_database,
-            query_batches_fifo,
-            query_stock_qty,
-            get_db_row,
-            list_db_rows
-        ])
-        .setup(|_app| Ok(()))
         .run(tauri::generate_context!())
         .expect("error while running Akhtar Autos Desktop");
 }
+
+#[cfg(test)]
+mod tests;

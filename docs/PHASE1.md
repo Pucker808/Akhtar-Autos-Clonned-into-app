@@ -23,7 +23,7 @@
 ## Verify on a Windows machine
 
 ```bash
-npm install
-npm run test
-npm run desktop:dev   # requires WebView2 + recent Rust toolchain
+bun install --frozen-lockfile
+bun run test
+bun run desktop:dev   # requires WebView2 + recent Rust toolchain
 ```

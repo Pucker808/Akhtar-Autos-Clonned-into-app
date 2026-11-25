@@ -75,13 +75,17 @@ export async function sqliteHealthConfigured(): Promise<DbHealth> {
   return sqliteCheckPath(path);
 }
 
-/** Apply ordered mutations in one SQLite transaction (full rollback on error). */
+/**
+ * Apply ordered mutations in one SQLite transaction (full rollback on error).
+ * Reuse the same requestId when retrying the same operation.
+ */
 export async function sqliteApplyMutations(
   path: string,
+  requestId: string,
   mutations: Mutation[],
 ): Promise<TxResult> {
   requireTauri();
-  return invoke<TxResult>("apply_db_mutations", { path, mutations });
+  return invoke<TxResult>("apply_db_mutations", { path, requestId, mutations });
 }
 
 export async function sqliteImportSnapshot(

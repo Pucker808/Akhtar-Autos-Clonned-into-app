@@ -19,13 +19,15 @@ export function isTauriRuntime(): boolean {
 
 /**
  * Resolve active persistence adapter.
- * - Explicit session override always wins (tests / recovery tools).
- * - Non-Tauri without session: always dexie (browser safety).
- * - Tauri: localStorage flag, else dexie (until cutover).
+ * - Non-Tauri: always dexie (browser safety), even if a flag was set.
+ * - Tauri: session override, then localStorage flag, else dexie (until cutover).
+ *
+ * Phase 2: this flag does NOT move business data. ops.ts and the UI always use
+ * Dexie; the flag only gates the helpers in data-access/.
  */
 export function getPersistenceMode(): PersistenceMode {
-  if (sessionMode) return sessionMode;
   if (!isTauriRuntime()) return "dexie";
+  if (sessionMode) return sessionMode;
   try {
     const v = localStorage.getItem(MODE_KEY);
     if (v === "sqlite" || v === "dexie") return v;

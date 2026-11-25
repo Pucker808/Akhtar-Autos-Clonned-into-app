@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
+  ClientOnly,
   Link,
   createRootRouteWithContext,
   useRouter,
@@ -124,7 +125,10 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
+      {/* ClientOnly keeps the static SPA shell and the first client render identical. */}
+      <ClientOnly fallback={null}>
+        <Outlet />
+      </ClientOnly>
     </QueryClientProvider>
   );
 }

@@ -4,10 +4,10 @@
   "version": "0.1.0",
   "identifier": "com.akhtar.autos.desktop",
   "build": {
-    "beforeDevCommand": "npm run dev",
+    "beforeDevCommand": "bun run dev",
     "devUrl": "http://localhost:5173",
-    "beforeBuildCommand": "npm run build",
-    "frontendDist": "../dist"
+    "beforeBuildCommand": "bun run build",
+    "frontendDist": "../dist/client"
   },
   "app": {
     "windows": [

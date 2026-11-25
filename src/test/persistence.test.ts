@@ -10,6 +10,8 @@ import { toPaisa, fromPaisa, formatPKR, pctOf } from "../lib/money";
 
 describe("persistence mode", () => {
   beforeEach(() => {
+    Reflect.deleteProperty(window, "__TAURI_INTERNALS__");
+    localStorage.clear();
     setPersistenceMode("dexie");
     setConfiguredSqlitePath(null);
   });
@@ -19,7 +21,14 @@ describe("persistence mode", () => {
     expect(isSqliteMode()).toBe(false);
   });
 
-  it("can select sqlite mode for adapter tests without dual-write", () => {
+  it("never reports sqlite outside the Tauri runtime, even when forced", () => {
+    setPersistenceMode("sqlite");
+    expect(getPersistenceMode()).toBe("dexie");
+    expect(isSqliteMode()).toBe(false);
+  });
+
+  it("can select sqlite mode only inside Tauri", () => {
+    Object.defineProperty(window, "__TAURI_INTERNALS__", { value: {}, configurable: true });
     setPersistenceMode("sqlite");
     expect(getPersistenceMode()).toBe("sqlite");
     expect(isSqliteMode()).toBe(true);

@@ -5,6 +5,7 @@
   "description": "Akhtar Autos Desktop — offline-first inventory and shop management for Windows",
   "sideEffects": false,
   "type": "module",
+  "packageManager": "bun@1.4.4",
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
@@ -12,6 +13,7 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "tauri": "tauri",

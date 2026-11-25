@@ -1,5 +1,7 @@
 # Local folder data & downloadable app
 
+> **Note:** This guide was imported from the web app. For this desktop repository use the Bun commands in `README.md`; the npm steps below are outdated.
+
 ## What you get today (in the web / PWA app)
 
 1. **Local data folder (PC – Chrome or Edge)**  

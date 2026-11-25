@@ -1,0 +1,497 @@
+{
+ "itemId": 1,
+ "stock": 8,
+ "tables": {
+  "items": [
+   {
+    "sku": "BP-1",
+    "name": "Brake pad",
+    "unit": "pc",
+    "reorder_level": 2,
+    "cost": 99999,
+    "price": 200000,
+    "supplier_id": 1,
+    "location_id": 1,
+    "brand": "B",
+    "category": "C",
+    "barcode": "111",
+    "compat": "x",
+    "oem": "y",
+    "notes": "z",
+    "archived": 0,
+    "created_at": 1795582927053,
+    "updated_at": 1795582927055,
+    "device_id": "dev-cc8d4e93-c9b2-43a9-85ba-01cda3bfd2a0",
+    "id": 1
+   }
+  ],
+  "locations": [
+   {
+    "name": "Main Shop",
+    "type": "shop",
+    "created_at": 1795582927050,
+    "updated_at": 1795582927050,
+    "device_id": "dev-cc8d4e93-c9b2-43a9-85ba-01cda3bfd2a0",
+    "id": 1
+   },
+   {
+    "name": "Rack A",
+    "type": "rack",
+    "parent_id": 1,
+    "created_at": 1795582927050,
+    "updated_at": 1795582927050,
+    "device_id": "dev-cc8d4e93-c9b2-43a9-85ba-01cda3bfd2a0",
+    "id": 2
+   }
+  ],
+  "batches": [
+   {
+    "item_id": 1,
+    "location_id": 1,
+    "qty": 2,
+    "unit_cost": 90000,
+    "date": 1773082799000,
+    "source": "opening",
+    "supplier_id": 1,
+    "remaining": 0,
+    "created_at": 1795582927053,
+    "updated_at": 1795582927058,
+    "device_id": "dev-cc8d4e93-c9b2-43a9-85ba-01cda3bfd2a0",
+    "id": 1
+   },
+   {
+    "item_id": 1,
+    "location_id": 1,
+    "qty": 10,
+    "unit_cost": 99999,
+    "date": 1773082800000,
+    "supplier_id": 1,
+    "source": "purchase",
+    "ref_id": 1,
+    "remaining": 5,
+    "created_at": 1795582927054,
+    "updated_at": 1795582927065,
+    "device_id": "dev-cc8d4e93-c9b2-43a9-85ba-01cda3bfd2a0",
+    "id": 2
+   },
+   {
+    "item_id": 1,
+    "location_id": 1,
+    "qty": 1,
+    "unit_cost": 93333,
+    "date": 1773082806000,
+    "source": "sale_return",
+    "ref_id": 1,
+    "remaining": 1,
+    "created_at": 1795582927060,
+    "updated_at": 1795582927060,
+    "device_id": "dev-cc8d4e93-c9b2-43a9-85ba-01cda3bfd2a0",
+    "id": 3
+   },
+   {
+    "item_id": 1,
+    "location_id": 2,
+    "qty": 2,
+    "unit_cost": 99999,
+    "date": 1773082800000,
+    "supplier_id": 1,
+    "source": "transfer",
+    "ref_id": 2,
+    "remaining": 2,
+    "created_at": 1795582927064,
+    "updated_at": 1795582927064,
+    "device_id": "dev-cc8d4e93-c9b2-43a9-85ba-01cda3bfd2a0",
+    "id": 4
+   }
+  ],
+  "ledger": [
+   {
+    "item_id": 1,
+    "location_id": 1,
+    "type": "opening",
+    "qty": 2,
+    "cost": 180000,
+    "date": 1773082799000,
+    "ref_type": "batch",
+    "ref_id": 1,
+    "note": "Opening balance",
+    "created_at": 1795582927053,
+    "updated_at": 1795582927053,
+    "device_id": "dev-cc8d4e93-c9b2-43a9-85ba-01cda3bfd2a0",
+    "id": 1
+   },
+   {
+    "item_id": 1,
+    "location_id": 1,
+    "type": "purchase",
+    "qty": 10,
+    "cost": 999990,
+    "date": 1773082800000,
+    "ref_type": "purchase",
+    "ref_id": 1,
+    "note": "B1",
+    "created_at": 1795582927054,
+    "updated_at": 1795582927054,
+    "device_id": "dev-cc8d4e93-c9b2-43a9-85ba-01cda3bfd2a0",
+    "id": 2
+   },
+   {
+    "item_id": 1,
+    "location_id": 1,
+    "type": "sale",
+    "qty": -3,
+    "cost": 279999,
+    "date": 1773082805000,
+    "ref_type": "sale",
+    "ref_id": 1,
+    "note": "AA-20260310-0001",
+    "created_at": 1795582927059,
+    "updated_at": 1795582927059,
+    "device_id": "dev-cc8d4e93-c9b2-43a9-85ba-01cda3bfd2a0",
+    "id": 3
+   },
+   {
+    "item_id": 1,
+    "location_id": 1,
+    "type": "sale_return",
+    "qty": 1,
+    "cost": 93333,
+    "date": 1773082806000,
+    "ref_type": "sale",
+    "ref_id": 1,
+    "note": "Return AA-20260310-0001 (batch 3)",
+    "created_at": 1795582927060,
+    "updated_at": 1795582927060,
+    "device_id": "dev-cc8d4e93-c9b2-43a9-85ba-01cda3bfd2a0",
+    "id": 4
+   },
+   {
+    "item_id": 1,
+    "location_id": 1,
+    "type": "purchase_return",
+    "qty": -1,
+    "cost": 99999,
+    "date": 1773082807000,
+    "ref_type": "purchase",
+    "ref_id": 1,
+    "note": "Return B1",
+    "created_at": 1795582927062,
+    "updated_at": 1795582927062,
+    "device_id": "dev-cc8d4e93-c9b2-43a9-85ba-01cda3bfd2a0",
+    "id": 5
+   },
+   {
+    "item_id": 1,
+    "location_id": 1,
+    "type": "transfer_out",
+    "qty": -2,
+    "cost": 199998,
+    "date": 1773082808000,
+    "note": "t",
+    "created_at": 1795582927064,
+    "updated_at": 1795582927064,
+    "device_id": "dev-cc8d4e93-c9b2-43a9-85ba-01cda3bfd2a0",
+    "id": 6
+   },
+   {
+    "item_id": 1,
+    "location_id": 2,
+    "type": "transfer_in",
+    "qty": 2,
+    "cost": 199998,
+    "date": 1773082808000,
+    "note": "t",
+    "created_at": 1795582927064,
+    "updated_at": 1795582927064,
+    "device_id": "dev-cc8d4e93-c9b2-43a9-85ba-01cda3bfd2a0",
+    "id": 7
+   },
+   {
+    "item_id": 1,
+    "location_id": 1,
+    "type": "adjust",
+    "qty": -1,
+    "cost": 99999,
+    "date": 1773082809000,
+    "note": "damaged",
+    "created_at": 1795582927065,
+    "updated_at": 1795582927065,
+    "device_id": "dev-cc8d4e93-c9b2-43a9-85ba-01cda3bfd2a0",
+    "id": 8
+   }
+  ],
+  "customers": [
+   {
+    "name": "Cust",
+    "created_at": 1795582927051,
+    "updated_at": 1795582927051,
+    "device_id": "dev-cc8d4e93-c9b2-43a9-85ba-01cda3bfd2a0",
+    "id": 1
+   }
+  ],
+  "suppliers": [
+   {
+    "name": "Sup",
+    "phone": "0300",
+    "address": "Kohat",
+    "notes": "n",
+    "created_at": 1795582927051,
+    "updated_at": 1795582927051,
+    "device_id": "dev-cc8d4e93-c9b2-43a9-85ba-01cda3bfd2a0",
+    "id": 1
+   }
+  ],
+  "sales": [
+   {
+    "invoice_no": "AA-20260310-0001",
+    "date": 1773082805000,
+    "customer_id": 1,
+    "customer_name": "Cust",
+    "location_id": 1,
+    "lines_json": "[{\"itemId\":1,\"name\":\"Brake pad\",\"sku\":\"BP-1\",\"qty\":3,\"price\":200000,\"discount\":0,\"cogs\":279999,\"allocs\":[{\"batchId\":1,\"qty\":2,\"unitCost\":90000},{\"batchId\":2,\"qty\":1,\"unitCost\":99999}],\"returnedQty\":1}]",
+    "subtotal": 600000,
+    "discount": 0,
+    "tax_pct": 0,
+    "tax": 0,
+    "total": 600000,
+    "paid": 100000,
+    "method": "cash",
+    "notes": "s",
+    "status": "posted",
+    "created_at": 1795582927059,
+    "updated_at": 1795582927060,
+    "device_id": "dev-cc8d4e93-c9b2-43a9-85ba-01cda3bfd2a0",
+    "id": 1
+   }
+  ],
+  "sale_returns": [
+   {
+    "sale_id": 1,
+    "invoice_no": "AA-20260310-0001",
+    "customer_id": 1,
+    "date": 1773082806000,
+    "lines_json": "[{\"itemId\":1,\"name\":\"Brake pad\",\"qty\":1,\"amount\":200000,\"cogs\":93333}]",
+    "amount": 200000,
+    "refund_cash": 0,
+    "credit_amount": 200000,
+    "method": "cash",
+    "created_at": 1795582927061,
+    "updated_at": 1795582927061,
+    "device_id": "dev-cc8d4e93-c9b2-43a9-85ba-01cda3bfd2a0",
+    "id": 1
+   }
+  ],
+  "purchases": [
+   {
+    "bill_no": "B1",
+    "supplier_id": 1,
+    "date": 1773082800000,
+    "due_date": 1773169200000,
+    "location_id": 1,
+    "lines_json": "[{\"itemId\":1,\"name\":\"Brake pad\",\"qty\":10,\"unitCost\":100001,\"discount\":7,\"batchId\":2,\"returnedQty\":1}]",
+    "subtotal": 1000003,
+    "discount": 13,
+    "total": 999990,
+    "paid": 0,
+    "method": "credit",
+    "notes": "p",
+    "created_at": 1795582927054,
+    "updated_at": 1795582927062,
+    "device_id": "dev-cc8d4e93-c9b2-43a9-85ba-01cda3bfd2a0",
+    "id": 1
+   }
+  ],
+  "purchase_returns": [
+   {
+    "purchase_id": 1,
+    "supplier_id": 1,
+    "date": 1773082807000,
+    "lines_json": "[{\"itemId\":1,\"name\":\"Brake pad\",\"qty\":1,\"amount\":99999,\"cost\":99999}]",
+    "amount": 99999,
+    "refund_cash": 0,
+    "credit_amount": 99999,
+    "created_at": 1795582927062,
+    "updated_at": 1795582927062,
+    "device_id": "dev-cc8d4e93-c9b2-43a9-85ba-01cda3bfd2a0",
+    "id": 1
+   }
+  ],
+  "payments": [
+   {
+    "party_type": "customer",
+    "party_id": 1,
+    "amount": 500,
+    "method": "cash",
+    "date": 1773082810000,
+    "created_at": 1795582927066,
+    "updated_at": 1795582927066,
+    "device_id": "dev-cc8d4e93-c9b2-43a9-85ba-01cda3bfd2a0",
+    "id": 1
+   },
+   {
+    "party_type": "supplier",
+    "party_id": 1,
+    "amount": 700,
+    "method": "bank",
+    "date": 1773082811000,
+    "note": "n",
+    "created_at": 1795582927066,
+    "updated_at": 1795582927066,
+    "device_id": "dev-cc8d4e93-c9b2-43a9-85ba-01cda3bfd2a0",
+    "id": 2
+   }
+  ],
+  "expenses": [
+   {
+    "date": 1773082800000,
+    "category": "Rent",
+    "amount": 1234,
+    "method": "cash",
+    "payee": "L",
+    "recurring": "monthly",
+    "voided": 0,
+    "created_at": 1795582927072,
+    "updated_at": 1795582927072,
+    "device_id": "dev-cc8d4e93-c9b2-43a9-85ba-01cda3bfd2a0",
+    "id": 1
+   }
+  ],
+  "audit": [
+   {
+    "at": 1795582927051,
+    "action": "create",
+    "entity": "location",
+    "entity_id": 2,
+    "detail": "Rack A",
+    "device_id": "dev-cc8d4e93-c9b2-43a9-85ba-01cda3bfd2a0",
+    "id": 1
+   },
+   {
+    "at": 1795582927051,
+    "action": "create",
+    "entity": "suppliers",
+    "entity_id": 1,
+    "detail": "Sup",
+    "device_id": "dev-cc8d4e93-c9b2-43a9-85ba-01cda3bfd2a0",
+    "id": 2
+   },
+   {
+    "at": 1795582927052,
+    "action": "create",
+    "entity": "customers",
+    "entity_id": 1,
+    "detail": "Cust",
+    "device_id": "dev-cc8d4e93-c9b2-43a9-85ba-01cda3bfd2a0",
+    "id": 3
+   },
+   {
+    "at": 1795582927053,
+    "action": "create",
+    "entity": "item",
+    "entity_id": 1,
+    "detail": "Brake pad",
+    "device_id": "dev-cc8d4e93-c9b2-43a9-85ba-01cda3bfd2a0",
+    "id": 4
+   },
+   {
+    "at": 1795582927056,
+    "action": "create",
+    "entity": "purchase",
+    "entity_id": 1,
+    "detail": "B1 999990",
+    "device_id": "dev-cc8d4e93-c9b2-43a9-85ba-01cda3bfd2a0",
+    "id": 5
+   },
+   {
+    "at": 1795582927059,
+    "action": "create",
+    "entity": "sale",
+    "entity_id": 1,
+    "detail": "AA-20260310-0001 600000",
+    "device_id": "dev-cc8d4e93-c9b2-43a9-85ba-01cda3bfd2a0",
+    "id": 6
+   },
+   {
+    "at": 1795582927061,
+    "action": "return",
+    "entity": "sale",
+    "entity_id": 1,
+    "detail": "AA-20260310-0001 value 200000",
+    "device_id": "dev-cc8d4e93-c9b2-43a9-85ba-01cda3bfd2a0",
+    "id": 7
+   },
+   {
+    "at": 1795582927062,
+    "action": "return",
+    "entity": "purchase",
+    "entity_id": 1,
+    "detail": "B1 value 99999",
+    "device_id": "dev-cc8d4e93-c9b2-43a9-85ba-01cda3bfd2a0",
+    "id": 8
+   },
+   {
+    "at": 1795582927064,
+    "action": "transfer",
+    "entity": "item",
+    "entity_id": 1,
+    "detail": "2 units",
+    "device_id": "dev-cc8d4e93-c9b2-43a9-85ba-01cda3bfd2a0",
+    "id": 9
+   },
+   {
+    "at": 1795582927065,
+    "action": "adjust",
+    "entity": "item",
+    "entity_id": 1,
+    "detail": "-1 — damaged",
+    "device_id": "dev-cc8d4e93-c9b2-43a9-85ba-01cda3bfd2a0",
+    "id": 10
+   },
+   {
+    "at": 1795582927066,
+    "action": "payment",
+    "entity": "customer",
+    "entity_id": 1,
+    "detail": "500",
+    "device_id": "dev-cc8d4e93-c9b2-43a9-85ba-01cda3bfd2a0",
+    "id": 11
+   },
+   {
+    "at": 1795582927071,
+    "action": "payment",
+    "entity": "supplier",
+    "entity_id": 1,
+    "detail": "700",
+    "device_id": "dev-cc8d4e93-c9b2-43a9-85ba-01cda3bfd2a0",
+    "id": 12
+   },
+   {
+    "at": 1795582927072,
+    "action": "create",
+    "entity": "expense",
+    "entity_id": 1,
+    "detail": "Rent 1234",
+    "device_id": "dev-cc8d4e93-c9b2-43a9-85ba-01cda3bfd2a0",
+    "id": 13
+   }
+  ],
+  "meta": [
+   {
+    "key": "counter:AA:20260310",
+    "value": "1"
+   },
+   {
+    "key": "driveAutoUpload",
+    "value": "true"
+   },
+   {
+    "key": "driveLastSync",
+    "value": "\"2026-03-10T00:00:00Z\""
+   },
+   {
+    "key": "settings",
+    "value": "{\"shopName\":\"Akhtar Autos\",\"taxEnabled\":false}"
+   }
+  ]
+ }
+}
