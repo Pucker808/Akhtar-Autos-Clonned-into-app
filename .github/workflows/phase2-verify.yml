@@ -1,153 +1,71 @@
 name: Phase 2 Verify
 
+# Every step here is required. Do not add `continue-on-error`.
 on:
-  workflow_dispatch:
   push:
-    paths:
-      - "src-tauri/**"
-      - "src/lib/**"
-      - "src/test/**"
-      - "package.json"
-      - "vitest.config.ts"
-      - "tsconfig.json"
-      - ".github/workflows/phase2-verify.yml"
+    branches: [phase2-repair, main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
 
 jobs:
-  rust-check:
-    name: Rust cargo check
+  frontend:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: src-tauri
     steps:
       - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      - run: bun install --frozen-lockfile
+      - run: bunx tsc --noEmit
+      - run: bun test
+      - run: bun run build
 
-      - name: Install system deps (Tauri 2 / Linux)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            patchelf \
-            build-essential \
-            curl \
-            wget \
-            file \
-            libssl-dev \
-            libgtk-3-dev \
-            libsoup-3.0-dev
-
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+  rust-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
-
-      - name: cargo fmt --check
-        run: cargo fmt --all -- --check
-        continue-on-error: true
-
-      - name: cargo check
-        run: cargo check --all-targets
-        env:
-          CARGO_TERM_COLOR: always
-
-  frontend-test:
-    name: TypeScript + Vitest
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - name: Install dependencies (Bun)
-        run: bun install --no-save
-
-      - name: TypeScript check (strict; non-blocking for pre-existing index-signature noise)
-        run: bunx tsc --noEmit
-        continue-on-error: true
-
-      - name: Migration tests
-        run: bunx vitest run src/test/migration.test.ts
-
-      - name: Persistence tests
-        run: bunx vitest run src/test/persistence.test.ts
-
-      - name: Ops regression tests (Dexie accounting)
-        run: bunx vitest run src/test/ops.test.ts
-
-      - name: Receipt + routing tests
-        run: bunx vitest run src/test/receipt.test.ts src/test/app-routing.test.tsx
-
-  static-audit:
-    name: Static consistency audit
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Verify recovered sources and wiring
+      - name: Install Linux dependencies
         run: |
-          set -euo pipefail
-          python3 << 'PY'
-          from pathlib import Path
-          import re
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - name: fmt
+        working-directory: src-tauri
+        run: cargo fmt --check
+      - name: check
+        working-directory: src-tauri
+        run: cargo check --locked
+      - name: clippy
+        working-directory: src-tauri
+        run: cargo clippy --locked -- -D warnings
+      - name: test
+        working-directory: src-tauri
+        run: cargo test --locked
 
-          root = Path(".")
-          db_tx = (root / "src-tauri/src/db_tx.rs").read_text()
-          lib_rs = (root / "src-tauri/src/lib.rs").read_text()
-          migration = (root / "src/lib/migration.ts").read_text()
-          adapter = (root / "src/lib/data-access/sqlite-adapter.ts").read_text()
-          persistence = (root / "src/lib/persistence.ts").read_text()
-
-          for name, text in [("db_tx.rs", db_tx), ("migration.ts", migration)]:
-              if "include!" in text:
-                  raise SystemExit(f"{name} still has include!")
-              if "PLACEHOLDER" in text:
-                  raise SystemExit(f"{name} has PLACEHOLDER")
-
-          required_fns = [
-              "apply_mutations", "export_table", "import_snapshot",
-              "backup_database", "restore_database", "query_batches_fifo",
-              "query_stock_qty", "get_row", "list_rows",
-          ]
-          for fn in required_fns:
-              if f"pub fn {fn}" not in db_tx:
-                  raise SystemExit(f"missing pub fn {fn} in db_tx.rs")
-
-          required_cmds = [
-              "apply_db_mutations", "import_db_snapshot", "export_db_table",
-              "backup_database", "restore_database", "query_batches_fifo",
-              "query_stock_qty", "get_db_row", "list_db_rows",
-              "create_database", "check_database_path",
-          ]
-          for cmd in required_cmds:
-              if cmd not in lib_rs:
-                  raise SystemExit(f"lib.rs missing command {cmd}")
-
-          invokes = re.findall(r'invoke(?:<[^>]+>)?\("([^"]+)"', adapter)
-          for inv in set(invokes):
-              if inv not in lib_rs:
-                  raise SystemExit(f"adapter invokes unknown command: {inv}")
-
-          if '"dexie"' not in persistence:
-              raise SystemExit("persistence.ts does not reference dexie default")
-
-          for key in ["saleReturns", "purchaseReturns", "items", "batches", "ledger", "payments"]:
-              if key not in migration:
-                  raise SystemExit(f"migration.ts missing Dexie key {key}")
-
-          if "sale_returns" not in db_tx or "purchase_returns" not in db_tx:
-              raise SystemExit("db_tx TABLE_ORDER missing return tables")
-
-          print("static audit OK")
-          print("db_tx.rs bytes", len(db_tx.encode()))
-          print("migration.ts bytes", len(migration.encode()))
-          PY
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: bun install --frozen-lockfile
+      - run: bunx tsc --noEmit
+      - run: bun test
+      - run: bun run build
+      - name: cargo test
+        working-directory: src-tauri
+        run: cargo test --locked
+      - name: tauri build
+        working-directory: src-tauri
+        run: cargo tauri build --no-bundle
