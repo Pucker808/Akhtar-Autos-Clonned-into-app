@@ -1,16 +1,10 @@
-# Installs the freshly built NSIS installer on the CI machine and checks that the
+# Installs the NSIS test build (same code as the release installer, plus a
+# debugging port from tauri.smoke.conf.json) and checks that the
 # app opens, saves data, and keeps it across a restart and a reinstall.
 $ErrorActionPreference = "Stop"
 $setup = Get-ChildItem "src-tauri/target/release/bundle/nsis/*-setup.exe" | Select-Object -First 1
-$env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=9222"
 $out = Join-Path $env:RUNNER_TEMP "smoke"
 New-Item -ItemType Directory -Force $out | Out-Null
-
-# The app passes its own WebView2 options, so also set the documented policy key
-# that adds the debugging port. This is done on the throwaway CI machine only.
-$policy = "HKCU:\Software\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments"
-New-Item -Path $policy -Force | Out-Null
-New-ItemProperty -Path $policy -Name "*" -Value "--remote-debugging-port=9222" -PropertyType String -Force | Out-Null
 
 function Write-Diagnostics($process) {
   Write-Host "App exited: $($process.HasExited) $(if ($process.HasExited) { "code $($process.ExitCode)" })"

@@ -106,6 +106,8 @@ jobs:
         run: |
           npm install --no-audit --no-fund --prefix "$RUNNER_TEMP/pw" playwright-core@1.63.0
           echo "PW_DIR=$RUNNER_TEMP/pw" >> "$GITHUB_ENV"
+      - name: Build test-only installer with a debugging port (never uploaded)
+        run: bunx tauri build --bundles nsis --config e2e/tauri.smoke.conf.json
       - name: Windows install and launch test
         shell: pwsh
         run: ./e2e/windows-smoke.ps1
