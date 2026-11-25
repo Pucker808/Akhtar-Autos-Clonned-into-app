@@ -63,28 +63,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js 22
-        uses: actions/setup-node@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: "22"
+          bun-version: latest
 
-      - name: Install dependencies
-        run: npm install --no-fund --no-audit
+      - name: Install dependencies (Bun)
+        run: bun install --no-save
 
       - name: TypeScript check
-        run: npx tsc --noEmit
+        run: bunx tsc --noEmit
 
       - name: Migration tests
-        run: npx vitest run src/test/migration.test.ts
+        run: bunx vitest run src/test/migration.test.ts
 
       - name: Persistence tests
-        run: npx vitest run src/test/persistence.test.ts
+        run: bunx vitest run src/test/persistence.test.ts
 
       - name: Ops regression tests (Dexie accounting)
-        run: npx vitest run src/test/ops.test.ts
+        run: bunx vitest run src/test/ops.test.ts
 
       - name: Receipt + routing tests
-        run: npx vitest run src/test/receipt.test.ts src/test/app-routing.test.tsx
+        run: bunx vitest run src/test/receipt.test.ts src/test/app-routing.test.tsx
 
   static-audit:
     name: Static consistency audit
