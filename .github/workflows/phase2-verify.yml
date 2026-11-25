@@ -1,10 +1,9 @@
 name: Phase 2 Verify
 
 # Every step here is required. Do not add `continue-on-error`.
+# TEMP: only workflow_dispatch while remaining replace-files are pushed.
 on:
   workflow_dispatch:
-  push:
-  pull_request:
 
 permissions:
   contents: read
