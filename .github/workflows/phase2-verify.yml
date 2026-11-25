@@ -67,7 +67,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: npm
 
       - name: Install dependencies
         run: npm install --no-fund --no-audit
@@ -98,24 +97,21 @@ jobs:
           set -euo pipefail
           python3 << 'PY'
           from pathlib import Path
-          import re, hashlib
+          import re
 
           root = Path(".")
           db_tx = (root / "src-tauri/src/db_tx.rs").read_text()
           lib_rs = (root / "src-tauri/src/lib.rs").read_text()
           migration = (root / "src/lib/migration.ts").read_text()
           adapter = (root / "src/lib/data-access/sqlite-adapter.ts").read_text()
-          types = (root / "src/lib/data-access/types.ts").read_text()
           persistence = (root / "src/lib/persistence.ts").read_text()
 
-          # No placeholders / include wrappers
           for name, text in [("db_tx.rs", db_tx), ("migration.ts", migration)]:
               if "include!" in text:
                   raise SystemExit(f"{name} still has include!")
               if "PLACEHOLDER" in text:
                   raise SystemExit(f"{name} has PLACEHOLDER")
 
-          # Required Rust pub fns
           required_fns = [
               "apply_mutations", "export_table", "import_snapshot",
               "backup_database", "restore_database", "query_batches_fifo",
@@ -125,7 +121,6 @@ jobs:
               if f"pub fn {fn}" not in db_tx:
                   raise SystemExit(f"missing pub fn {fn} in db_tx.rs")
 
-          # lib.rs registers commands
           required_cmds = [
               "apply_db_mutations", "import_db_snapshot", "export_db_table",
               "backup_database", "restore_database", "query_batches_fifo",
@@ -136,28 +131,18 @@ jobs:
               if cmd not in lib_rs:
                   raise SystemExit(f"lib.rs missing command {cmd}")
 
-          # Adapter invoke names match commands
           invokes = re.findall(r'invoke(?:<[^>]+>)?\("([^"]+)"', adapter)
           for inv in set(invokes):
-              if inv not in lib_rs and inv != "get_default_data_root":
-                  # get_default_data_root is in lib.rs
-                  pass
-          for inv in set(invokes):
-              if f"fn {inv}" not in lib_rs and f"{inv}," not in lib_rs and inv not in lib_rs:
+              if inv not in lib_rs:
                   raise SystemExit(f"adapter invokes unknown command: {inv}")
 
-          # Dexie remains default
-          if 'return "dexie"' not in persistence and "return 'dexie'" not in persistence:
-              # tolerant of formatting
-              if '"dexie"' not in persistence:
-                  raise SystemExit("persistence.ts does not default to dexie")
+          if '"dexie"' not in persistence:
+              raise SystemExit("persistence.ts does not reference dexie default")
 
-          # Migration maps all Dexie tables
           for key in ["saleReturns", "purchaseReturns", "items", "batches", "ledger", "payments"]:
               if key not in migration:
                   raise SystemExit(f"migration.ts missing Dexie key {key}")
 
-          # TABLE_ORDER parity
           if "sale_returns" not in db_tx or "purchase_returns" not in db_tx:
               raise SystemExit("db_tx TABLE_ORDER missing return tables")
 
