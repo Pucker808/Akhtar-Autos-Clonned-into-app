@@ -44,7 +44,7 @@ export interface Purchase extends Base {
 }
 export interface PurchaseReturn extends Base {
   purchaseId: number; supplierId: number; date: number;
-  lines: { itemId: number; name: string; qty: number; amount: Paisa; cost: Paisa }[];
+  lines: { itemId: number; name: string; qty: number; amount: Paisa; cost: Paisa; allocs?: Alloc[] | undefined }[];
   amount: Paisa; refundCash: Paisa; creditAmount: Paisa; notes?: string | undefined;
 }
 export interface Payment extends Base {

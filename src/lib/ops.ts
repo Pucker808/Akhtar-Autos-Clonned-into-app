@@ -4,15 +4,15 @@ import { pctOf, type Paisa } from "./money";
 import { msToPkDate } from "./dates";
 
 export class OpError extends Error {}
-const now = () => Date.now();
-function stamp<T extends object>(o: T): T & { createdAt: number; updatedAt: number; deviceId: string } {
+export const now = () => Date.now();
+export function stamp<T extends object>(o: T): T & { createdAt: number; updatedAt: number; deviceId: string } {
   const t = now();
   return { ...o, createdAt: t, updatedAt: t, deviceId: deviceIdSync() };
 }
-async function audit(action: string, entity: string, entityId?: number, detail?: string) {
+export async function audit(action: string, entity: string, entityId?: number, detail?: string) {
   await db.audit.add({ at: now(), action, entity, entityId, detail, deviceId: deviceIdSync() });
 }
-const ALL = () => [db.items, db.locations, db.batches, db.ledger, db.customers, db.suppliers, db.sales, db.saleReturns, db.purchases, db.purchaseReturns, db.payments, db.expenses, db.audit, db.meta];
+export const ALL = () => [db.items, db.locations, db.batches, db.ledger, db.customers, db.suppliers, db.sales, db.saleReturns, db.purchases, db.purchaseReturns, db.payments, db.expenses, db.audit, db.meta];
 
 export async function ensureDefaults() {
   await getDeviceId();
@@ -30,7 +30,7 @@ export async function stockQty(itemId: number, locationId?: number): Promise<num
 }
 
 /** Consume FIFO from batches at a location. Shortfall (if allowed) is costed at fallbackCost with batchId null. */
-async function consumeFIFO(itemId: number, locationId: number, qty: number, allowShort: boolean, fallbackCost: Paisa, preferBatchIds: number[] = []): Promise<Alloc[]> {
+export async function consumeFIFO(itemId: number, locationId: number, qty: number, allowShort: boolean, fallbackCost: Paisa, preferBatchIds: number[] = []): Promise<Alloc[]> {
   const batches = (await db.batches.where("[itemId+locationId]").equals([itemId, locationId]).toArray())
     .filter((b) => b.remaining > 0)
     .sort((a, b) => {
@@ -52,12 +52,12 @@ async function consumeFIFO(itemId: number, locationId: number, qty: number, allo
   }
   return allocs;
 }
-const allocCost = (a: Alloc[]) => a.reduce((s, x) => s + x.qty * x.unitCost, 0);
+export const allocCost = (a: Alloc[]) => a.reduce((s, x) => s + x.qty * x.unitCost, 0);
 
-async function addBatch(b: Omit<Batch, "id" | "createdAt" | "updatedAt" | "deviceId" | "remaining">) {
+export async function addBatch(b: Omit<Batch, "id" | "createdAt" | "updatedAt" | "deviceId" | "remaining">) {
   return db.batches.add(stamp({ ...b, remaining: b.qty }));
 }
-async function addLedger(l: Omit<Ledger, "id" | "createdAt" | "updatedAt" | "deviceId">) {
+export async function addLedger(l: Omit<Ledger, "id" | "createdAt" | "updatedAt" | "deviceId">) {
   return db.ledger.add(stamp(l));
 }
 
@@ -262,7 +262,7 @@ export async function returnPurchase(p: { purchaseId: number; lines: { itemId: n
       const amount = Math.round((((line.qty * line.unitCost - line.discount) * r.qty) / line.qty) * ratio);
       line.returnedQty += r.qty;
       await addLedger({ itemId: r.itemId, locationId: pur.locationId, type: "purchase_return", qty: -r.qty, cost, date, refType: "purchase", refId: pur.id, note: `Return ${pur.billNo}` });
-      rl.push({ itemId: r.itemId, name: line.name, qty: r.qty, amount, cost });
+      rl.push({ itemId: r.itemId, name: line.name, qty: r.qty, amount, cost, allocs });
     }
     if (rl.length === 0) throw new OpError("Select at least one item");
     const amount = rl.reduce((s, l) => s + l.amount, 0);
