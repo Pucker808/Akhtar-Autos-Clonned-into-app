@@ -1,4 +1,4 @@
-// Drives the installed app: node e2e/smoke.cjs <windows|android> <add|verify|backup> [screenshot]
+// Drives the installed app: node e2e/smoke.cjs <windows|android> <add|verify|backup|update|updated> [screenshot]
 // playwright-core is installed outside the project (PW_DIR) so the lockfile is untouched.
 const fs = require("node:fs");
 const path = require("node:path");
@@ -52,6 +52,16 @@ async function openPage() {
       await (await pending).saveAs(target);
       const backup = JSON.parse(fs.readFileSync(target, "utf8"));
       if (!backup.items.some((i) => i.sku === SKU)) throw new Error("Backup does not contain the item");
+    }
+    if (phase === "update") {
+      // The banner appears by itself; the app closes while the installer runs.
+      await page.getByRole("button", { name: "Abhi update karein" }).click({ timeout: 60000 });
+      await page.waitForEvent("close", { timeout: 180000 });
+    }
+    if (phase === "updated") {
+      const expected = process.env.EXPECTED_VERSION;
+      await page.getByRole("button", { name: /^settings$/i }).click();
+      await page.getByText(`Installed version: ${expected}`).waitFor({ timeout: 30000 });
     }
     if (errors.length) throw new Error("Page errors: " + errors.join(" | "));
     console.log(`SMOKE PASS ${platform} ${phase}`);

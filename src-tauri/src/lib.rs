@@ -149,9 +149,15 @@ fn with_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builde
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    with_commands(tauri::Builder::default())
+    let builder = with_commands(tauri::Builder::default())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_fs::init());
+    // Android installs updates through the APK, not through this plugin.
+    #[cfg(desktop)]
+    let builder = builder
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init());
+    builder
         .run(tauri::generate_context!())
         .expect("error while running Akhtar Autos Desktop");
 }

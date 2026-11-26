@@ -25,6 +25,15 @@
       "csp": null
     }
   },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDk2QjdGOUY3RDU3OTYxRDQKUldUVVlYblY5L20zbHVEaFFzUU5OUzE5UTVRU0JvSFVtT21vTHgrRUREcm1iSGhOZ3lVY013UHoK",
+      "endpoints": [
+        "https://github.com/Pucker808/Akhtar-Autos-Clonned-into-app/releases/latest/download/latest.json"
+      ],
+      "windows": { "installMode": "passive" }
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",

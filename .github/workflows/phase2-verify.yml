@@ -3,6 +3,7 @@ name: Phase 2 Verify
 # Every step here is required. Do not add `continue-on-error`.
 on:
   workflow_dispatch:
+  workflow_call:
   push:
   pull_request:
 
@@ -111,6 +112,9 @@ jobs:
       - name: Windows install and launch test
         shell: pwsh
         run: ./e2e/windows-smoke.ps1
+      - name: Windows in-app update test (test key, local update server)
+        shell: pwsh
+        run: ./e2e/windows-update.ps1
       - name: Upload Windows screenshots
         if: always()
         uses: actions/upload-artifact@v4
