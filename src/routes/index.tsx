@@ -13,6 +13,9 @@ import { getSettings } from "../lib/settings";
 import { askText, askConfirm, printHtml } from "@/lib/ui-dialogs";
 import { saveTextFile } from "@/lib/save-file";
 import { UpdatePanel } from "@/components/update-banner";
+import { EditButton, EntryList, CorrectionHistory } from "@/components/corrections-ui";
+import { RestoreBackupButton } from "@/components/restore-backup";
+import { buildBackupPayload } from "@/lib/backup";
 
 // Dexie/IndexedDB UI: render only in the client, matching the static SPA shell.
 export const Route = createFileRoute("/")({ ssr: false, component: Index });
@@ -135,6 +138,8 @@ function Index() {
       setBusy(false);
     }
   }
+
+  const corrected = () => void act(async () => {}, "Entry theek ho gayi.");
 
   const ask = async (s: string, d = ""): Promise<string | null> => askText(s, d);
 
@@ -299,7 +304,7 @@ function Index() {
             </div>
             <Panel title="Low / out of stock">{[...(stock?.out || []), ...(stock?.low || [])].map((x: any) => <p key={x.item.id} className="border-b py-2 text-sm">{x.item.name}: {x.qty} remaining</p>)}</Panel>
           </>}
-          {tab === "inventory" && <Panel title="Inventory catalogue"><input className="mb-3 w-full rounded border p-2" placeholder="Search items" value={q} onChange={(e) => setQ(e.target.value)} /><Table heads={["Part", "SKU", "Cost", "Sale price", "Stock", ""]} >{items.filter((i) => !i.archived && [i.name, i.sku, i.brand || ""].join(" ").toLowerCase().includes(q.toLowerCase())).map((i) => <tr key={i.id}><td>{i.name}</td><td>{i.sku}</td><td>{money(i.cost)}</td><td>{money(i.price)}</td><td>{stock?.rows.find((x: any) => x.item.id === i.id)?.qty || 0}</td><td><button className="text-red-600" onClick={() => i.id && void act(() => setItemArchived(i.id!, true), "Item archived")}>Archive</button></td></tr>)}</Table></Panel>}
+          {tab === "inventory" && <Panel title="Inventory catalogue"><input className="mb-3 w-full rounded border p-2" placeholder="Search items" value={q} onChange={(e) => setQ(e.target.value)} /><Table heads={["Part", "SKU", "Cost", "Sale price", "Stock", ""]} >{items.filter((i) => !i.archived && [i.name, i.sku, i.brand || ""].join(" ").toLowerCase().includes(q.toLowerCase())).map((i) => <tr key={i.id}><td>{i.name}</td><td>{i.sku}</td><td>{money(i.cost)}</td><td>{money(i.price)}</td><td>{stock?.rows.find((x: any) => x.item.id === i.id)?.qty || 0}</td><td><EditButton kind="item" id={i.id} onSaved={corrected} /> <button className="text-red-600" onClick={() => i.id && void act(() => setItemArchived(i.id!, true), "Item archived")}>Archive</button></td></tr>)}</Table></Panel>}
           {tab === "sales" && <>
             {saleOpen && <Panel title="Point of sale">
               <div className="grid gap-3 md:grid-cols-2">
@@ -322,7 +327,8 @@ function Index() {
               <p className="mt-3 text-sm">Total <b>{money(saleTotal)}</b> · Due <b>{money(Math.max(0, saleTotal - toPaisa(salePaid === "" ? (saleTotal / 100).toFixed(2) : salePaid)))}</b></p>
               <div className="mt-3 flex gap-2"><button disabled={busy} className="rounded bg-amber-500 px-4 py-2 font-bold disabled:opacity-40" onClick={saveSale}>Save invoice</button><button className="rounded border px-4 py-2" onClick={() => setSaleOpen(false)}>Cancel</button></div>
             </Panel>}
-            <Panel title="Sales register"><Table heads={["Invoice", "Date", "Customer", "Total", "Paid", "Due", "Actions"]}>{sales.map((s) => <tr key={s.id}><td>{s.invoiceNo}</td><td>{fDate(s.date)}</td><td>{s.customerName}</td><td>{money(s.total)}</td><td>{money(s.paid)}</td><td>{money(s.total - s.paid)}</td><td className="space-x-2"><button className="text-amber-700" onClick={() => void openReceipt(s)}>Print</button><button className="text-slate-600" onClick={() => doSaleReturn(s)}>Return</button></td></tr>)}</Table></Panel>
+            <Panel title="Sales register"><Table heads={["Invoice", "Date", "Customer", "Total", "Paid", "Due", "Actions"]}>{sales.map((s) => <tr key={s.id}><td>{s.invoiceNo}</td><td>{fDate(s.date)}</td><td>{s.customerName}</td><td>{money(s.total)}</td><td>{money(s.paid)}</td><td>{money(s.total - s.paid)}</td><td className="space-x-2"><button className="text-amber-700" onClick={() => void openReceipt(s)}>Print</button><button className="text-slate-600" onClick={() => doSaleReturn(s)}>Return</button><EditButton kind="sale" id={s.id} onSaved={corrected} /></td></tr>)}</Table></Panel>
+            <EntryList kind="saleReturn" version={summary} onSaved={corrected} />
           </>}
           {tab === "purchases" && <>
             {purOpen && <Panel title="Purchase bill">
@@ -345,10 +351,11 @@ function Index() {
               <p className="mt-3 text-sm">Bill total <b>{money(purTotal)}</b> · Due <b>{money(Math.max(0, purTotal - toPaisa(purPaid || "0")))}</b></p>
               <div className="mt-3 flex gap-2"><button disabled={busy} className="rounded bg-amber-500 px-4 py-2 font-bold disabled:opacity-40" onClick={savePurchase}>Save purchase</button><button className="rounded border px-4 py-2" onClick={() => setPurOpen(false)}>Cancel</button></div>
             </Panel>}
-            <Panel title="Purchase bills"><Table heads={["Bill", "Date", "Supplier", "Total", "Paid", "Due", "Actions"]}>{purchases.map((p) => <tr key={p.id}><td>{p.billNo}</td><td>{fDate(p.date)}</td><td>{suppliers.find((s) => s.id === p.supplierId)?.name || "Supplier"}</td><td>{money(p.total)}</td><td>{money(p.paid)}</td><td>{money(p.total - p.paid)}</td><td><button className="text-slate-600" onClick={() => doPurchaseReturn(p)}>Return</button></td></tr>)}</Table></Panel>
+            <Panel title="Purchase bills"><Table heads={["Bill", "Date", "Supplier", "Total", "Paid", "Due", "Actions"]}>{purchases.map((p) => <tr key={p.id}><td>{p.billNo}</td><td>{fDate(p.date)}</td><td>{suppliers.find((s) => s.id === p.supplierId)?.name || "Supplier"}</td><td>{money(p.total)}</td><td>{money(p.paid)}</td><td>{money(p.total - p.paid)}</td><td><button className="text-slate-600" onClick={() => doPurchaseReturn(p)}>Return</button> <EditButton kind="purchase" id={p.id} onSaved={corrected} /></td></tr>)}</Table></Panel>
+            <EntryList kind="purchaseReturn" version={summary} onSaved={corrected} />
           </>}
-          {tab === "parties" && <div className="grid gap-5 xl:grid-cols-2"><Panel title="Customers"><PartyRows rows={customers} pay={(p) => payment("customer", p)} /></Panel><Panel title="Suppliers"><PartyRows rows={suppliers} pay={(p) => payment("supplier", p)} /></Panel></div>}
-          {tab === "expenses" && <Panel title="Expenses"><Table heads={["Date", "Category", "Payee", "Amount"]}>{expenses.map((e) => <tr key={e.id}><td>{fDate(e.date)}</td><td>{e.category}</td><td>{e.payee || "—"}</td><td>{money(e.amount)}</td></tr>)}</Table></Panel>}
+          {tab === "parties" && <div className="grid gap-5 xl:grid-cols-2"><Panel title="Customers"><PartyRows kind="customers" rows={customers} pay={(p) => payment("customer", p)} onSaved={corrected} /></Panel><Panel title="Suppliers"><PartyRows kind="suppliers" rows={suppliers} pay={(p) => payment("supplier", p)} onSaved={corrected} /></Panel><EntryList kind="payment" version={summary} onSaved={corrected} /></div>}
+          {tab === "expenses" && <Panel title="Expenses"><Table heads={["Date", "Category", "Payee", "Amount", ""]}>{expenses.map((e) => <tr key={e.id}><td>{fDate(e.date)}</td><td>{e.category}</td><td>{e.payee || "—"}</td><td>{money(e.amount)}</td><td><EditButton kind="expense" id={e.id} onSaved={corrected} /></td></tr>)}</Table></Panel>}
           {tab === "reports" && <div className="space-y-5">
             <div className="flex flex-wrap gap-2"><span className="self-center text-sm text-slate-600">Period:</span>{(["today", "week", "month", "year"] as const).map((p) => <button key={p} onClick={() => { setPeriod(p); void refresh(p); }} className={"rounded px-3 py-1.5 text-sm capitalize " + (period === p ? "bg-slate-800 text-white" : "bg-slate-100")}>{p}</button>)}</div>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -357,6 +364,7 @@ function Index() {
               <Metric label="Purchases" value={money(summary?.purchases)} /><Metric label="Supplier paid" value={money(summary?.supplierPaid)} /><Metric label="Invoices" value={String(summary?.invoices || 0)} /><Metric label="Units sold" value={String(summary?.unitsSold || 0)} />
             </div>
             <Panel title="Payment methods (cash collected)"><div className="flex flex-wrap gap-3 text-sm">{summary?.byMethod && Object.entries(summary.byMethod).map(([m, v]) => <span key={m} className="rounded bg-slate-50 px-3 py-1 capitalize">{m}: {money(v as number)}</span>)}</div></Panel>
+            <CorrectionHistory version={summary} />
           </div>}
           {tab === "settings" && <div className="space-y-5">
             <Panel title="Application appearance">
@@ -386,7 +394,7 @@ function Index() {
               </div>
             </Panel>
             <UpdatePanel />
-            <Panel title="Local backup"><p className="mb-3 text-sm">Download a JSON copy of this device's database.</p><button className="rounded bg-amber-500 px-4 py-2" onClick={() => void (async () => { const names = ["items", "locations", "batches", "ledger", "customers", "suppliers", "sales", "saleReturns", "purchases", "purchaseReturns", "payments", "expenses", "audit", "meta"]; const data: any = { app: "Akhtar Autos", version: 1 }; for (const n of names) data[n] = await db.table(n).toArray(); try { await saveTextFile("akhtar-autos-backup.json", JSON.stringify(data)); } catch (e) { setMsg("Backup was not saved: " + (e instanceof Error ? e.message : String(e))); } })()}>Download backup</button></Panel>
+            <Panel title="Local backup"><p className="mb-3 text-sm">Download a JSON copy of this device's database, or restore one.</p><button className="rounded bg-amber-500 px-4 py-2" onClick={() => void (async () => { try { await saveTextFile("akhtar-autos-backup.json", JSON.stringify(await buildBackupPayload())); } catch (e) { setMsg("Backup was not saved: " + (e instanceof Error ? e.message : String(e))); } })()}>Download backup</button> <RestoreBackupButton onRestored={() => void act(async () => {}, "Backup restore ho gaya.")} onError={setMsg} /></Panel>
           </div>}
         </div>
       </main>
@@ -397,4 +405,4 @@ function Index() {
 function Metric({ label, value }: { label: string; value: string }) { return <div className="app-card rounded-xl border bg-white p-5"><div className="text-xs uppercase text-slate-500">{label}</div><div className="mt-2 text-2xl font-bold">{value}</div></div>; }
 function Panel({ title, children }: { title: string; children: React.ReactNode }) { return <section className="app-card rounded-xl border bg-white p-5"><h2 className="mb-4 font-bold">{title}</h2>{children}</section>; }
 function Table({ heads, children }: { heads: string[]; children: React.ReactNode }) { return <div className="overflow-x-auto"><table className="w-full min-w-[600px] text-left text-sm"><thead><tr className="bg-slate-50 text-xs text-slate-500">{heads.map((h) => <th key={h} className="p-3">{h}</th>)}</tr></thead><tbody className="divide-y">{children}</tbody></table></div>; }
-function PartyRows({ rows, pay }: { rows: Party[]; pay: (p: Party) => void }) { return <div className="divide-y">{rows.map((p) => <div key={p.id} className="flex items-center justify-between py-3"><div><b>{p.name}</b><p className="text-xs text-slate-500">{p.phone || "No phone"}</p></div><button className="text-amber-700" onClick={() => pay(p)}>Record payment</button></div>)}</div>; }
+function PartyRows({ kind, rows, pay, onSaved }: { kind: "customers" | "suppliers"; rows: Party[]; pay: (p: Party) => void; onSaved: () => void }) { return <div className="divide-y">{rows.map((p) => <div key={p.id} className="flex items-center justify-between py-3"><div><b>{p.name}</b><p className="text-xs text-slate-500">{p.phone || "No phone"}</p></div><div className="flex gap-2"><EditButton kind={kind} id={p.id} onSaved={onSaved} /><button className="text-amber-700" onClick={() => pay(p)}>Record payment</button></div></div>)}</div>; }

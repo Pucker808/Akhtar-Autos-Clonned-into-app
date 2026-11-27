@@ -221,7 +221,8 @@ export async function downloadBackupFile() {
 /** Import a user-picked JSON file (works on any browser / phone). */
 export async function importBackupFile(file: File): Promise<string> {
   const payload = JSON.parse(await file.text());
-  if (payload.app !== "Akhtar Autos" || !payload.formatVersion) {
+  // Files from the older "Download backup" button carry `version` instead.
+  if (payload.app !== "Akhtar Autos" || !(payload.formatVersion || payload.version === 1)) {
     throw new Error("File is not a valid Akhtar Autos backup.");
   }
   await db.transaction("rw", DATA_TABLES.map((name) => db.table(name)), async () => {

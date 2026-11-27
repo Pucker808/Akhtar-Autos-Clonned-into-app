@@ -29,3 +29,9 @@ Before installing, every table is written to
 update does not run. In the uninstaller, never tick "delete application data".
 
 Pushing code alone changes nothing on the user's PC. Android is not covered.
+
+## Restoring a backup
+
+Settings, "Local backup", "Restore from file" loads a downloaded backup or one of
+the automatic files above. On Windows the current records are first saved to
+`pre-restore-backups` in the same app data folder.
