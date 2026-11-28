@@ -128,6 +128,57 @@ describe("refused corrections change nothing", () => {
   });
 });
 
+describe("purchase date and line safety", () => {
+  beforeEach(() => reset());
+  async function dated(id: number, date: number) {
+    const p = (await db.purchases.get(id))!;
+    return { ...(await billFix(id, p.lines[0]!.qty, p.lines[0]!.unitCost)), date };
+  }
+  async function refusedUnchanged(id: number, fix: Parameters<typeof correctPurchase>[1], message: RegExp) {
+    const before = await dump();
+    await expect(correctPurchase(id, fix)).rejects.toThrow(message);
+    expect(await dump()).toBe(before);
+  }
+  it("refuses a date that puts a bill ahead of stock already sold", async () => {
+    await buy(5, 1000, DAY); const second = await buy(5, 2000, 2 * DAY); await sell(5, 2000, 3 * DAY);
+    await refusedUnchanged(second, await dated(second, T0), /FIFO order/);
+  });
+  it("refuses a date that moves a sold bill behind another one", async () => {
+    const first = await buy(5, 1000, DAY); await buy(5, 2000, 2 * DAY); await sell(3, 2000, 3 * DAY);
+    await refusedUnchanged(first, await dated(first, T0 + 3 * DAY), /FIFO order/);
+  });
+  it("allows a date change that keeps the order", async () => {
+    const first = await buy(5, 1000, DAY); await buy(5, 2000, 3 * DAY); await sell(3, 2000, 4 * DAY);
+    await correctPurchase(first, await dated(first, T0 + 2 * DAY));
+    expect((await db.purchases.get(first))!.date).toBe(T0 + 2 * DAY);
+  });
+  it("allows reordering stock that has not moved", async () => {
+    await buy(5, 1000, DAY); const second = await buy(5, 2000, 2 * DAY);
+    await correctPurchase(second, await dated(second, T0));
+    const s = await sell(5, 2000, 3 * DAY);
+    expect((await db.sales.get(s))!.lines[0]!.cogs).toBe(10000);
+  });
+  it("refuses the same stock line twice", async () => {
+    const id = await buy(10, 1000);
+    const fix = await billFix(id, 6, 1000);
+    await refusedUnchanged(id, { ...fix, lines: [fix.lines[0]!, { ...fix.lines[0]!, qty: 4 }] }, /do dafa/);
+  });
+  it("carries a cost fix through stock that was sold and returned twice", () => {
+    const history = async (cost: number) => {
+      const b = await buy(4, cost);
+      for (const at of [5000, 7000]) {
+        const s = await sell(4, 2000, at);
+        await returnSale({ saleId: s, lines: [{ itemId: item, qty: 4 }], refundCash: 0, method: "cash", date: T0 + at + 1000 });
+      }
+      await sell(3, 2000, 9500);
+      return b;
+    };
+    return sameAs(
+      async () => { const b = await history(9000); await correctPurchase(b, await billFix(b, 4, 1000)); },
+      async () => { await history(1000); });
+  });
+});
+
 describe("simple corrections", () => {
   beforeEach(() => reset());
   it("renames reach saved invoices, and each correction is logged", async () => {

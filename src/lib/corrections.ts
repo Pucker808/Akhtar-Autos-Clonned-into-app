@@ -177,6 +177,27 @@ export async function correctSale(saleId: number, p: SaleCorrection) {
 }
 
 // ---------- Purchase bill ----------
+/**
+ * FIFO uses the oldest batch first (date, then id). Saved sales are not replayed,
+ * so a new date is refused when it would move a batch that already has stock out
+ * of it behind another batch: that stock would have been taken in another order.
+ */
+async function assertFifoOrderSafe(billBatchIds: number[], newDate: number) {
+  const earlier = (aDate: number, aId: number, bDate: number, bId: number) => aDate < bDate || (aDate === bDate && aId < bId);
+  for (const id of billBatchIds) {
+    const mine = await getBatch(id);
+    const others = await db.batches.where("itemId").equals(mine.itemId)
+      .and((b) => b.locationId === mine.locationId && !billBatchIds.includes(b.id!)).toArray();
+    for (const other of others) {
+      const wasFirst = earlier(mine.date, id, other.date, other.id!);
+      if (wasFirst === earlier(newDate, id, other.date, other.id!)) continue;
+      if (consumedFrom(wasFirst ? mine : other) > 0) {
+        throw new OpError("Yeh date nahi lag sakti: is se pehle bike ya nikle hue maal ka FIFO order (purana maal pehle) badal jata hai. Baqi values theek ki ja sakti hain.");
+      }
+    }
+  }
+}
+
 export interface PurchaseCorrection {
   billNo: string; supplierId: number; date: number; paid: number; method: PayMethod; discount: number; notes?: string | undefined;
   /** batchId identifies an existing line; leave it out for a line that was missed. */
@@ -187,6 +208,8 @@ export async function correctPurchase(purchaseId: number, p: PurchaseCorrection)
   if (!p.supplierId) throw new OpError("Select a supplier");
   if (p.lines.length === 0) throw new OpError("Bill mein kam az kam ek item hona chahiye");
   for (const l of p.lines) if (!Number.isInteger(l.qty) || l.qty <= 0 || !isMoney(l.unitCost) || !isMoney(l.discount) || l.discount > l.qty * l.unitCost) throw new OpError("Invalid line quantity/cost/discount");
+  const batchIds = p.lines.flatMap((l) => (l.batchId ? [l.batchId] : []));
+  if (new Set(batchIds).size !== batchIds.length) throw new OpError("Bill ki ek hi stock line do dafa nahi aa sakti");
   const subtotal = p.lines.reduce((s, l) => s + l.qty * l.unitCost - l.discount, 0);
   if (!isMoney(p.discount) || p.discount > subtotal) throw new OpError("Invalid bill discount");
   const total = subtotal - p.discount;
@@ -212,6 +235,8 @@ export async function correctPurchase(purchaseId: number, p: PurchaseCorrection)
       const share = sub > 0 ? net - Math.round((billDiscount * net) / sub) : 0;
       return Math.round(share / l.qty);
     };
+
+    if (p.date !== pur.date) await assertFifoOrderSafe(batchIds, p.date);
 
     for (const old of pur.lines.filter((o) => !p.lines.some((l) => l.batchId === o.batchId))) {
       const b = await getBatch(old.batchId!);
